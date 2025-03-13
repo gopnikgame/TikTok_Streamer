@@ -1,45 +1,45 @@
 @echo off
-chcp 1251 > nul
+chcp 866 > nul
 setlocal enabledelayedexpansion
 title TikTok Streamer Launcher
 
-:: Установка цветовых схем
-color 0A
-
-:: Создаем временную папку для скачивания
-if not exist ".\temp" mkdir ".\temp"
+:: Скрипт запуска TikTok Streamer
+:: Показывает прогресс установки и запуска программы
 
 echo ===============================================================
 echo           TikTok Streamer - Запуск приложения
 echo ===============================================================
 echo.
 
+:: Создаем временную папку для скачивания если её нет
+if not exist ".\temp" mkdir ".\temp"
+
 :: Проверяем наличие Python
 echo [*] Проверка наличия Python...
 where python >nul 2>&1
 if !ERRORLEVEL! neq 0 (
-    echo [-] Python не найден. Необходимо установить Python.
+    echo [-] Python не найден. Установка Python...
     goto install_python
 ) else (
-    echo [+] Python установлен, проверяем версию...
+    python -c "import sys; print(sys.version_info[0], '.', sys.version_info[1], sep='')" > .\temp\pyversion.txt
+    set /p PYVER=<.\temp\pyversion.txt
+    echo [+] Найден Python !PYVER!
+    
+    :: Проверяем версию Python (нужна 3.8 или выше)
+    python -c "import sys; v=sys.version_info; print(1 if (v[0] >= 3 and v[1] >= 8) else 0)" > .\temp\pycheck.txt
+    set /p PYCHECK=<.\temp\pycheck.txt
+    
+    if !PYCHECK! EQU 0 (
+        echo [-] Версия Python слишком старая. Требуется 3.8 или выше.
+        goto install_python
+    ) else (
+        echo [+] Версия Python соответствует требованиям.
+    )
 )
-
-:: Проверяем версию Python (нужна 3.8 или выше)
-python -c "import sys; print(sys.version_info[0]*10 + sys.version_info[1])" > .\temp\pyver.txt
-set /p pyver=<.\temp\pyver.txt
-del .\temp\pyver.txt
-
-if !pyver! LSS 38 (
-    echo [-] Установленная версия Python слишком старая. Требуется Python 3.8 или выше.
-    goto install_python
-) else (
-    echo [+] Версия Python соответствует требованиям.
-)
-goto check_deps
+goto install_deps
 
 :install_python
-echo [*] Скачивание и установка Python 3.10...
-:: Скачиваем Python
+echo [*] Скачивание Python 3.10...
 powershell -Command "& {[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri 'https://www.python.org/ftp/python/3.10.11/python-3.10.11-amd64.exe' -OutFile '.\temp\python_installer.exe'}"
 if !ERRORLEVEL! neq 0 (
     echo [-] Ошибка при скачивании Python. Проверьте подключение к интернету.
@@ -63,9 +63,12 @@ echo [!] Пожалуйста, перезапустите этот скрипт 
 pause
 exit /b 0
 
-:check_deps
+:install_deps
 echo.
 echo [*] Проверка и установка зависимостей...
+
+:: Обновляем переменные окружения, чтобы подхватить новый Python
+set PATH=%PATH%;%USERPROFILE%\AppData\Local\Programs\Python\Python310\Scripts\;%USERPROFILE%\AppData\Local\Programs\Python\Python310\
 
 :: Обновляем pip
 echo [*] Обновление pip...
@@ -141,8 +144,6 @@ if !ERRORLEVEL! neq 0 (
     echo.
     echo [-] Произошла ошибка при запуске приложения.
     echo [!] Проверьте файл error.log, если он существует.
-    pause
-    exit /b 1
 )
 
 pause
