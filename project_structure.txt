@@ -1,20 +1,22 @@
-telegram-publisher-bot/
-├── app/
+TTStreamerPy/
+├── app.py              # Точка входа в приложение
+├── requirements.txt    # Зависимости проекта
+├── assets/             # Папка для звуков и изображений
+├── services/           
 │   ├── __init__.py
-│   ├── __main__.py
-│   ├── bot.py
-│   ├── config.py
-│   ├── html.py
-│   └── utils.py
-├── docker/
-│   └── docker-compose.yml
-├── logs/
-├── scripts/
-│   └── manage_bot.sh
-├── .dockerignore
-├── .env
-├── .env.example
-├── .gitignore
-├── Dockerfile
-├── README.md
-└── requirements.txt
+│   ├── speech_service.py
+│   ├── sound_service.py
+│   └── gift_service.py
+├── models/             
+│   ├── __init__.py
+│   └── data_models.py
+├── viewmodels/         
+│   ├── __init__.py
+│   └── monitoring_viewmodel.py
+├── views/              
+│   ├── __init__.py
+│   ├── main_window.py
+│   └── monitoring_page.py
+└── utils/              
+    ├── __init__.py
+    └── settings.py
