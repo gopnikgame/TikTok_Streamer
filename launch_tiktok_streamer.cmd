@@ -1,4 +1,5 @@
 @echo off
+chcp 1251 > nul
 setlocal enabledelayedexpansion
 title TikTok Streamer Launcher
 
@@ -16,7 +17,7 @@ echo.
 :: Проверяем наличие Python
 echo [*] Проверка наличия Python...
 where python >nul 2>&1
-if %ERRORLEVEL% neq 0 (
+if !ERRORLEVEL! neq 0 (
     echo [-] Python не найден. Необходимо установить Python.
     goto install_python
 ) else (
@@ -24,11 +25,11 @@ if %ERRORLEVEL% neq 0 (
 )
 
 :: Проверяем версию Python (нужна 3.8 или выше)
-for /f "tokens=2" %%i in ('python -c "import sys; print(sys.version_info[0]*10 + sys.version_info[1])"') do (
-    set pyver=%%i
-)
+python -c "import sys; print(sys.version_info[0]*10 + sys.version_info[1])" > .\temp\pyver.txt
+set /p pyver=<.\temp\pyver.txt
+del .\temp\pyver.txt
 
-if %pyver% LSS 38 (
+if !pyver! LSS 38 (
     echo [-] Установленная версия Python слишком старая. Требуется Python 3.8 или выше.
     goto install_python
 ) else (
@@ -40,7 +41,7 @@ goto check_deps
 echo [*] Скачивание и установка Python 3.10...
 :: Скачиваем Python
 powershell -Command "& {[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri 'https://www.python.org/ftp/python/3.10.11/python-3.10.11-amd64.exe' -OutFile '.\temp\python_installer.exe'}"
-if %ERRORLEVEL% neq 0 (
+if !ERRORLEVEL! neq 0 (
     echo [-] Ошибка при скачивании Python. Проверьте подключение к интернету.
     echo [!] Посетите сайт: https://www.python.org/downloads/
     echo [!] И установите Python 3.10 или новее вручную.
@@ -51,7 +52,7 @@ if %ERRORLEVEL% neq 0 (
 :: Устанавливаем Python (тихая установка с добавлением в PATH)
 echo [*] Установка Python 3.10...
 .\temp\python_installer.exe /quiet InstallAllUsers=0 PrependPath=1 Include_test=0 Include_doc=0
-if %ERRORLEVEL% neq 0 (
+if !ERRORLEVEL! neq 0 (
     echo [-] Ошибка при установке Python. Попробуйте запустить от имени администратора.
     pause
     exit /b 1
@@ -91,7 +92,7 @@ if not exist "requirements.txt" (
 :: Устанавливаем зависимости из requirements.txt
 echo [*] Установка зависимостей из requirements.txt...
 python -m pip install -r requirements.txt
-if %ERRORLEVEL% neq 0 (
+if !ERRORLEVEL! neq 0 (
     echo [-] Ошибка при установке зависимостей.
     echo [*] Пробуем установить основные компоненты напрямую...
     
@@ -136,7 +137,7 @@ echo.
 echo [*] Запуск приложения TikTok Streamer...
 echo.
 python app.py
-if %ERRORLEVEL% neq 0 (
+if !ERRORLEVEL! neq 0 (
     echo.
     echo [-] Произошла ошибка при запуске приложения.
     echo [!] Проверьте файл error.log, если он существует.
@@ -144,4 +145,5 @@ if %ERRORLEVEL% neq 0 (
     exit /b 1
 )
 
+pause
 exit /b 0
