@@ -63,6 +63,9 @@ if ($installPython) {
         # Обновляем переменную PATH для текущей сессии
         $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "User") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "Machine") 
         
+        # Перезагружаем переменную PATH
+        $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Process")
+        
         Write-Host "[+] Python 3.10 успешно установлен." -ForegroundColor Green
         Write-Host "[*] Продолжаем установку..." -ForegroundColor Cyan
     } catch {
@@ -105,8 +108,10 @@ python-logging-loki>=0.3.1
 Write-Host "[*] Установка зависимостей из requirements.txt..." -ForegroundColor Cyan
 $pipResult = $false
 try {
-    python -m pip install -r requirements.txt 2>&1 | Out-String
-    $pipResult = $?
+    $pipResult = python -m pip install -r requirements.txt 2>&1 | Out-String
+    if ($LASTEXITCODE -eq 0) {
+        $pipResult = $true
+    }
 } catch {
     $pipResult = $false
 }
@@ -115,12 +120,18 @@ if (-not $pipResult) {
     Write-Host "[-] Ошибка при установке зависимостей." -ForegroundColor Red
     Write-Host "[*] Пробуем установить основные компоненты напрямую..." -ForegroundColor Cyan
     
-    python -m pip install PyQt6>=6.5.0
-    python -m pip install pyttsx3>=2.90
-    python -m pip install pygame>=2.5.0
-    python -m pip install TikTokLive>=5.0.0
-    python -m pip install aiohttp>=3.8.0
-    python -m pip install requests>=2.28.0
+    $modules = @("PyQt6", "pyttsx3", "pygame", "TikTokLive", "aiohttp", "requests")
+    foreach ($module in $modules) {
+        try {
+            python -m pip install $module
+            if ($LASTEXITCODE -ne 0) {
+                Write-Host "[-] Ошибка при установке $module." -ForegroundColor Red
+            }
+        } catch {
+            Write-Host "[-] Ошибка при установке $module:" -ForegroundColor Red
+            Write-Host $_.Exception.Message -ForegroundColor Red
+        }
+    }
 }
 
 # Проверяем установку зависимостей
