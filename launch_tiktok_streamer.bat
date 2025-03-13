@@ -25,18 +25,17 @@ if !ERRORLEVEL! neq 0 (
 )
 
 :: Проверяем версию Python (нужна 3.8 или выше)
-for /f "tokens=2" %%I in ('python -c "import sys; print(sys.version_info.major)"') do set PY_MAJOR=%%I
-for /f "tokens=2" %%I in ('python -c "import sys; print(sys.version_info.minor)"') do set PY_MINOR=%%I
+for /f "tokens=2 delims==" %%I in ('python -c "import sys; print(f'major={sys.version_info.major} minor={sys.version_info.minor}')"') do set %%I
 
-echo [*] Версия Python: !PY_MAJOR!.!PY_MINOR!
+echo [*] Версия Python: !major!.!minor!
 
-if !PY_MAJOR! LSS 3 (
+if !major! LSS 3 (
     echo [-] Версия Python слишком старая. Требуется Python 3.8 или выше.
     goto install_python
 )
 
-if !PY_MAJOR! EQU 3 (
-    if !PY_MINOR! LSS 8 (
+if !major! EQU 3 (
+    if !minor! LSS 8 (
         echo [-] Версия Python слишком старая. Требуется Python 3.8 или выше.
         goto install_python
     )
@@ -103,14 +102,14 @@ echo [*] Установка зависимостей из requirements.txt...
 python -m pip install -r requirements.txt
 if !ERRORLEVEL! neq 0 (
     echo [-] Ошибка при установке зависимостей.
-    echo [*] Пробуем установить основные компоненты напрямую...
+    echo [*] Попробуйте установить основные компоненты напрямую...
     
-    python -m pip install PyQt6>=6.5.0
-    python -m pip install pyttsx3>=2.90
-    python -m pip install pygame>=2.5.0
-    python -m pip install TikTokLive>=5.0.0
-    python -m pip install aiohttp>=3.8.0
-    python -m pip install requests>=2.28.0
+    for %%m in (PyQt6 pyttsx3 pygame TikTokLive aiohttp requests) do (
+        python -m pip install %%m
+        if !ERRORLEVEL! neq 0 (
+            echo [-] Ошибка при установке %%m.
+        )
+    )
 )
 
 echo.
