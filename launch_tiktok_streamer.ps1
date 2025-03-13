@@ -1,3 +1,7 @@
+# Установка кодировки для вывода в консоль
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$Host.UI.RawUI.WindowTitle = "TikTok Streamer Launcher"
+
 # Запуск от имени администратора (если требуется)
 if (-NOT ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
     Write-Host "Рекомендуется запустить от имени администратора для корректной установки Python и зависимостей" -ForegroundColor Yellow
@@ -56,9 +60,11 @@ if ($installPython) {
         Write-Host "[*] Установка Python 3.10..." -ForegroundColor Cyan
         Start-Process -FilePath $pythonInstaller -ArgumentList "/quiet", "InstallAllUsers=0", "PrependPath=1", "Include_test=0", "Include_doc=0" -Wait
         
-        Write-Host "[+] Python 3.10 успешно установлен. Перезапустите этот скрипт для продолжения." -ForegroundColor Green
-        Read-Host "Нажмите Enter для выхода"
-        exit
+        # Обновляем переменную PATH для текущей сессии
+        $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "User") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "Machine") 
+        
+        Write-Host "[+] Python 3.10 успешно установлен." -ForegroundColor Green
+        Write-Host "[*] Продолжаем установку..." -ForegroundColor Cyan
     } catch {
         Write-Host "[-] Ошибка при скачивании или установке Python:" -ForegroundColor Red
         Write-Host $_.Exception.Message -ForegroundColor Red
