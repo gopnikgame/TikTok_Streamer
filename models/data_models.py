@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from datetime import datetime
 from enum import IntEnum
+from PyQt6.QtWidgets import QComboBox, QSpinBox
 
 class AlertLevel(IntEnum):
     NORMAL = 0
