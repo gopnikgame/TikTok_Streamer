@@ -103,7 +103,7 @@ class MonitoringViewModel(Observable):
             self.logger.debug(f"Настройка звуковых оповещений изменена: {value}")
             self.notify_property_changed('notify_gift')
             
-        @property
+    @property
     def speech_gift(self):
         return self._speech_gift
         
@@ -182,7 +182,7 @@ class MonitoringViewModel(Observable):
         
         self.is_monitoring = False
         self.logger.info("Мониторинг остановлен")
-        def _run_tiktok_client(self):
+    def _run_tiktok_client(self):
         """Запускает клиент TikTok Live в отдельном потоке"""
         try:
             self.logger.debug("Создание нового event loop для TikTok клиента")
