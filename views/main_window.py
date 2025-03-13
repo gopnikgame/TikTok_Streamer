@@ -1,393 +1,555 @@
-import sys
-from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
-                             QTabWidget, QLabel, QLineEdit, QPushButton, QCheckBox, 
-                             QTableWidget, QTableWidgetItem, QHeaderView, QMessageBox,
-                             QComboBox, QSlider, QSpinBox)
-from PyQt6.QtCore import Qt, QTimer
-from viewmodels.monitoring_viewmodel import MonitoringViewModel
+import os
+import threading
+from PyQt6.QtWidgets import (
+    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableView, 
+    QTabWidget, QLineEdit, QLabel, QCheckBox, QComboBox, QSlider, QSpinBox,
+    QListView, QAbstractItemView, QMessageBox, QFileDialog
+)
+from PyQt6.QtCore import Qt, QAbstractTableModel, QModelIndex
+from PyQt6.QtGui import QStandardItemModel, QStandardItem
+
 from models.data_models import AlertLevel
+from utils.error_handler import ErrorHandler
+from utils.logger import Logger
+
+class EventsTableModel(QAbstractTableModel):
+    def __init__(self, viewmodel):
+        super().__init__()
+        self.viewmodel = viewmodel
+        self.headers = ["Время", "Пользователь", "Событие"]
+        
+    def rowCount(self, parent=None):
+        return len(self.viewmodel.item_list)
+    
+    def columnCount(self, parent=None):
+        return 3
+    
+    def data(self, index, role=Qt.ItemDataRole.DisplayRole):
+        if not index.isValid() or not (0 <= index.row() < len(self.viewmodel.item_list)):
+            return None
+        
+        item = self.viewmodel.item_list[index.row()]
+        
+        if role == Qt.ItemDataRole.DisplayRole:
+            if index.column() == 0:
+                return item.timestamp.strftime("%H:%M:%S")
+            elif index.column() == 1:
+                return item.name
+            elif index.column() == 2:
+                return item.event
+        
+        elif role == Qt.ItemDataRole.BackgroundRole:
+            if item.alert_level == AlertLevel.IMPORTANT:
+                return Qt.GlobalColor.yellow
+        
+        return None
+    
+    def headerData(self, section, orientation, role):
+        if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole:
+            return self.headers[section]
+        return None
 
 class MainWindow(QMainWindow):
-    def __init__(self, monitoring_viewmodel):
+    def __init__(self, viewmodel):
         super().__init__()
+        self.viewmodel = viewmodel
+        self.error_handler = ErrorHandler()
+        self.logger = Logger().get_logger('MainWindow')
+        self.logger.info("Инициализация главного окна")
         
-        self.viewmodel = monitoring_viewmodel
+        # Инициализируем UI
+        self.init_ui()
         
-        # Настраиваем главное окно
-        self.setWindowTitle("TTStreamerPy")
-        self.setMinimumSize(800, 600)
+        # Привязываем обработчики событий
+        self.bind_events()
         
-        # Создаем вкладки
-        self.tabs = QTabWidget()
-        self.monitoring_tab = self.create_monitoring_tab()
-        self.settings_tab = self.create_settings_tab()
-        self.sound_tab = self.create_sound_tab()
+        # Обновляем состояние UI
+        self.update_monitoring_state()
         
-        self.tabs.addTab(self.monitoring_tab, "Мониторинг")
-        self.tabs.addTab(self.settings_tab, "Настройки")
-        self.tabs.addTab(self.sound_tab, "Звуки")
-        
-        # Устанавливаем центральный виджет
-        self.setCentralWidget(self.tabs)
-        
-        # Настраиваем обновление UI
-        self.timer = QTimer()
-        self.timer.timeout.connect(self.update_ui)
-        self.timer.start(100)  # Обновление каждые 100 мс
-        
-        # Настраиваем привязки данных
-        self.bind_data()
+        self.logger.debug("Главное окно инициализировано")
     
-    def create_monitoring_tab(self):
+    def init_ui(self):
+        """Инициализирует пользовательский интерфейс"""
+        try:
+            self.setWindowTitle("TTStreamerPy")
+            self.resize(800, 600)
+            
+            # Создаем вкладки
+            tabs = QTabWidget()
+            tabs.addTab(self.create_monitoring_tab(), "Мониторинг")
+            tabs.addTab(self.create_settings_tab(), "Настройки")
+            tabs.addTab(self.create_sounds_tab(), "Звуки")
+            
+            # Устанавливаем основной виджет
+            self.setCentralWidget(tabs)
+        except Exception as e:
+            self.logger.error(f"Ошибка инициализации интерфейса: {str(e)}", exc_info=True)
+            self.error_handler.show_error_dialog(self, "Ошибка инициализации интерфейса", 
+                                              "Не удалось инициализировать пользовательский интерфейс", str(e))
+        def create_monitoring_tab(self):
         """Создает вкладку мониторинга"""
-        tab = QWidget()
-        layout = QVBoxLayout()
-        
-        # Виджеты для управления стримом
-        controls_layout = QHBoxLayout()
-        
-        # Поле для ID стрима
-        stream_label = QLabel("ID стрима:")
-        self.stream_input = QLineEdit()
-        controls_layout.addWidget(stream_label)
-        controls_layout.addWidget(self.stream_input)
-        
-        # Кнопка мониторинга
-        self.monitor_btn = QPushButton("Начать мониторинг")
-        self.monitor_btn.clicked.connect(self.toggle_monitoring)
-        controls_layout.addWidget(self.monitor_btn)
-        
-        layout.addLayout(controls_layout)
-        
-        # Настройки оповещений
-        notify_layout = QHBoxLayout()
-        
-        self.notify_gift_chk = QCheckBox("Звуковое оповещение о донатах")
-        self.speech_gift_chk = QCheckBox("Озвучивать донаты")
-        self.speech_like_chk = QCheckBox("Озвучивать лайки")
-        self.speech_member_chk = QCheckBox("Озвучивать подключения")
-        
-        notify_layout.addWidget(self.notify_gift_chk)
-        notify_layout.addWidget(self.speech_gift_chk)
-        notify_layout.addWidget(self.speech_like_chk)
-        notify_layout.addWidget(self.speech_member_chk)
-        
-        layout.addLayout(notify_layout)
-        
-        # Таблица событий
-        self.events_table = QTableWidget()
-        self.events_table.setColumnCount(3)
-        self.events_table.setHorizontalHeaderLabels(["Время", "Пользователь", "Событие"])
-        self.events_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        layout.addWidget(self.events_table)
-        
-        tab.setLayout(layout)
-        return tab
+        try:
+            tab = QWidget()
+            layout = QVBoxLayout()
+            
+            # Строка с полем для ID стрима и кнопкой запуска
+            stream_layout = QHBoxLayout()
+            
+            stream_label = QLabel("ID стрима:")
+            self.stream_input = QLineEdit()
+            self.stream_input.setText(self.viewmodel.stream)
+            
+            self.toggle_btn = QPushButton("Начать мониторинг")
+            self.toggle_btn.clicked.connect(self.toggle_monitoring)
+            
+            stream_layout.addWidget(stream_label)
+            stream_layout.addWidget(self.stream_input, 1)
+            stream_layout.addWidget(self.toggle_btn)
+            
+            layout.addLayout(stream_layout)
+            
+            # Чекбоксы для настроек
+            checks_layout = QHBoxLayout()
+            
+            self.notify_chk = QCheckBox("Звуковое оповещение")
+            self.notify_chk.setChecked(self.viewmodel.notify_gift)
+            self.notify_chk.clicked.connect(self.toggle_notify_gift)
+            
+            self.speech_gift_chk = QCheckBox("Озвучивать подарки")
+            self.speech_gift_chk.setChecked(self.viewmodel.speech_gift)
+            self.speech_gift_chk.clicked.connect(self.toggle_speech_gift)
+            
+            self.speech_like_chk = QCheckBox("Озвучивать лайки")
+            self.speech_like_chk.setChecked(self.viewmodel.speech_like)
+            self.speech_like_chk.clicked.connect(self.toggle_speech_like)
+            
+            self.speech_member_chk = QCheckBox("Озвучивать подключения")
+            self.speech_member_chk.setChecked(self.viewmodel.speech_member)
+            self.speech_member_chk.clicked.connect(self.toggle_speech_member)
+            
+            checks_layout.addWidget(self.notify_chk)
+            checks_layout.addWidget(self.speech_gift_chk)
+            checks_layout.addWidget(self.speech_like_chk)
+            checks_layout.addWidget(self.speech_member_chk)
+            
+            layout.addLayout(checks_layout)
+            
+            # Таблица событий
+            self.table_model = EventsTableModel(self.viewmodel)
+            self.table_view = QTableView()
+            self.table_view.setModel(self.table_model)
+            self.table_view.horizontalHeader().setStretchLastSection(True)
+            
+            layout.addWidget(self.table_view, 1)
+            
+            # Статус
+            self.status_label = QLabel("Статус: Готов к мониторингу")
+            layout.addWidget(self.status_label)
+            
+            tab.setLayout(layout)
+            return tab
+        except Exception as e:
+            self.logger.error(f"Ошибка при создании вкладки мониторинга: {str(e)}", exc_info=True)
+            self.error_handler.show_error_dialog(self, "Ошибка создания интерфейса", 
+                                              "Не удалось создать вкладку мониторинга", str(e))
+            # В случае ошибки возвращаем пустой виджет
+            return QWidget()
     
     def create_settings_tab(self):
         """Создает вкладку настроек"""
-        tab = QWidget()
-        layout = QVBoxLayout()
-        
-        # Настройки синтеза речи
-        speech_group_layout = QVBoxLayout()
-        speech_group_layout.addWidget(QLabel("Настройки синтеза речи"))
-        
-        # Выбор голоса
-        voice_layout = QHBoxLayout()
-        voice_label = QLabel("Голос:")
-        self.voice_combo = QComboBox()
-        self.voice_combo.addItems(self.viewmodel.speech_service.get_voices())
-        if self.viewmodel.settings.speech_voice:
-            index = self.voice_combo.findText(self.viewmodel.settings.speech_voice)
-            if index >= 0:
-                self.voice_combo.setCurrentIndex(index)
-        voice_layout.addWidget(voice_label)
-        voice_layout.addWidget(self.voice_combo)
-        speech_group_layout.addLayout(voice_layout)
-        
-        # Скорость речи
-        rate_layout = QHBoxLayout()
-        rate_label = QLabel("Скорость речи:")
-        self.rate_slider = QSlider(Qt.Orientation.Horizontal)
-        self.rate_slider.setMinimum(-10)
-        self.rate_slider.setMaximum(10)
-        self.rate_slider.setValue(self.viewmodel.settings.speech_rate)
-        rate_layout.addWidget(rate_label)
-        rate_layout.addWidget(self.rate_slider)
-        speech_group_layout.addLayout(rate_layout)
-        
-        # Тексты для озвучивания
-        text_group_layout = QVBoxLayout()
-        text_group_layout.addWidget(QLabel("Тексты для озвучивания"))
-        
-        # Текст для подключения
-        join_layout = QHBoxLayout()
-        join_label = QLabel("При подключении:")
-        self.join_text_input = QLineEdit(self.viewmodel.settings.join_text)
-        join_layout.addWidget(join_label)
-        join_layout.addWidget(self.join_text_input)
-        text_group_layout.addLayout(join_layout)
-        
-        # Текст для лайка
-        like_layout = QHBoxLayout()
-        like_label = QLabel("При лайке:")
-        self.like_text_input = QLineEdit(self.viewmodel.settings.like_text)
-        like_layout.addWidget(like_label)
-        like_layout.addWidget(self.like_text_input)
-        text_group_layout.addLayout(like_layout)
-        
-        # Задержка звуковых уведомлений
-        delay_layout = QHBoxLayout()
-        delay_label = QLabel("Задержка звуковых уведомлений (мс):")
-        self.delay_input = QSpinBox()
-        self.delay_input.setMinimum(0)
-        self.delay_input.setMaximum(5000)
-        self.delay_input.setValue(self.viewmodel.settings.notify_delay)
-        delay_layout.addWidget(delay_label)
-        delay_layout.addWidget(self.delay_input)
-        
-        # Кнопка сохранения настроек
-        save_btn = QPushButton("Сохранить настройки")
-        save_btn.clicked.connect(self.save_settings)
-        
-        # Добавляем все в основной layout
-        layout.addLayout(speech_group_layout)
-        layout.addLayout(text_group_layout)
-        layout.addLayout(delay_layout)
-        layout.addWidget(save_btn)
-        layout.addStretch(1)  # Пространство внизу
-        
-        tab.setLayout(layout)
-        return tab
-        def create_sound_tab(self):
-        """Создает вкладку настроек звуков"""
-        tab = QWidget()
-        layout = QVBoxLayout()
-        
-        # Таблица для привязки звуков к ID подарков
-        self.sounds_table = QTableWidget()
-        self.sounds_table.setColumnCount(3)
-        self.sounds_table.setHorizontalHeaderLabels(["ID подарка", "Звук", "Действия"])
-        self.sounds_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        layout.addWidget(self.sounds_table)
-        
-        # Добавление новой привязки
-        add_layout = QHBoxLayout()
-        
-        self.gift_id_input = QSpinBox()
-        self.gift_id_input.setMinimum(1)
-        self.gift_id_input.setMaximum(999999)
-        
-        self.sound_combo = QComboBox()
-        self.update_sound_combo()  # Заполняем список доступных звуков
-        
-        add_btn = QPushButton("Добавить")
-        add_btn.clicked.connect(self.add_sound_mapping)
-        
-        add_layout.addWidget(QLabel("ID подарка:"))
-        add_layout.addWidget(self.gift_id_input)
-        add_layout.addWidget(QLabel("Звук:"))
-        add_layout.addWidget(self.sound_combo)
-        add_layout.addWidget(add_btn)
-        
-        layout.addLayout(add_layout)
-        
-        # Кнопка обновления списка звуков
-        refresh_btn = QPushButton("Обновить список звуков")
-        refresh_btn.clicked.connect(self.update_sound_combo)
-        layout.addWidget(refresh_btn)
-        
-        # Заполняем таблицу звуков
-        self.update_sounds_table()
-        
-        tab.setLayout(layout)
-        return tab
+        try:
+            tab = QWidget()
+            layout = QVBoxLayout()
+            
+            # Голос
+            voice_layout = QHBoxLayout()
+            voice_layout.addWidget(QLabel("Голос:"))
+            
+            self.voice_combo = QComboBox()
+            try:
+                # Получаем список доступных голосов
+                voices = self.viewmodel.speech_service.get_voices()
+                self.voice_combo.addItem("") # Пустой вариант для значения по умолчанию
+                self.voice_combo.addItems(voices)
+                
+                # Устанавливаем текущий голос, если он задан
+                current_voice = self.viewmodel.settings.speech_voice
+                if current_voice and current_voice in voices:
+                    self.voice_combo.setCurrentText(current_voice)
+            except Exception as e:
+                self.logger.error(f"Ошибка получения списка голосов: {str(e)}", exc_info=True)
+                self.error_handler.handle_file_error(self, e, "voices")
+            
+            voice_layout.addWidget(self.voice_combo, 1)
+            layout.addLayout(voice_layout)
+            
+            # Скорость речи
+            rate_layout = QHBoxLayout()
+            rate_layout.addWidget(QLabel("Скорость речи:"))
+            
+            self.rate_slider = QSlider(Qt.Orientation.Horizontal)
+            self.rate_slider.setRange(-10, 10)
+            self.rate_slider.setValue(self.viewmodel.settings.speech_rate)
+            
+            rate_layout.addWidget(self.rate_slider, 1)
+            layout.addLayout(rate_layout)
+            
+            # Текст для подключения
+            join_layout = QHBoxLayout()
+            join_layout.addWidget(QLabel("Текст для подключения:"))
+            
+            self.join_text_input = QLineEdit()
+            self.join_text_input.setText(self.viewmodel.settings.join_text)
+            
+            join_layout.addWidget(self.join_text_input, 1)
+            layout.addLayout(join_layout)
+            
+            # Текст для лайка
+            like_layout = QHBoxLayout()
+            like_layout.addWidget(QLabel("Текст для лайка:"))
+            
+            self.like_text_input = QLineEdit()
+            self.like_text_input.setText(self.viewmodel.settings.like_text)
+            
+            like_layout.addWidget(self.like_text_input, 1)
+            layout.addLayout(like_layout)
+            
+            # Задержка звуковых уведомлений
+            delay_layout = QHBoxLayout()
+            delay_layout.addWidget(QLabel("Задержка между звуковыми уведомлениями (мс):"))
+            
+            self.delay_input = QSpinBox()
+            self.delay_input.setRange(0, 10000)
+            self.delay_input.setSingleStep(100)
+            self.delay_input.setValue(self.viewmodel.settings.notify_delay)
+            
+            delay_layout.addWidget(self.delay_input, 1)
+            layout.addLayout(delay_layout)
+            
+            # Кнопка сохранения
+            save_btn = QPushButton("Сохранить настройки")
+            save_btn.clicked.connect(self.save_settings)
+            
+            layout.addWidget(save_btn)
+            layout.addStretch(1)
+            
+            tab.setLayout(layout)
+            return tab
+        except Exception as e:
+            self.logger.error(f"Ошибка при создании вкладки настроек: {str(e)}", exc_info=True)
+            self.error_handler.show_error_dialog(self, "Ошибка создания интерфейса", 
+                                              "Не удалось создать вкладку настроек", str(e))
+            # В случае ошибки возвращаем пустой виджет
+            return QWidget()
     
-    def bind_data(self):
-        """Настраивает привязки данных между UI и ViewModel"""
-        # Привязка полей ввода
-        self.stream_input.setText(self.viewmodel.stream)
-        self.stream_input.textChanged.connect(self.update_stream)
-        
-        # Привязка чекбоксов
-        self.notify_gift_chk.setChecked(self.viewmodel.notify_gift)
-        self.speech_gift_chk.setChecked(self.viewmodel.speech_gift)
-        self.speech_like_chk.setChecked(self.viewmodel.speech_like)
-        self.speech_member_chk.setChecked(self.viewmodel.speech_member)
-        
-        self.notify_gift_chk.stateChanged.connect(self.update_notify_gift)
-        self.speech_gift_chk.stateChanged.connect(self.update_speech_gift)
-        self.speech_like_chk.stateChanged.connect(self.update_speech_like)
-        self.speech_member_chk.stateChanged.connect(self.update_speech_member)
-        
-        # Регистрируем колбэки для уведомлений об изменениях во ViewModel
-        self.viewmodel.add_callback('is_monitoring', self.update_monitoring_button)
-        self.viewmodel.add_callback('item_list', self.update_events_table)
+    def create_sounds_tab(self):
+        """Создает вкладку настройки звуков"""
+        try:
+            tab = QWidget()
+            layout = QVBoxLayout()
+            
+            # Панель для загрузки звуков
+            upload_layout = QHBoxLayout()
+            upload_btn = QPushButton("Загрузить звук")
+            upload_btn.clicked.connect(self.upload_sound)
+            
+            upload_layout.addWidget(upload_btn)
+            upload_layout.addStretch(1)
+            
+            layout.addLayout(upload_layout)
+            
+            # Список доступных звуков
+            layout.addWidget(QLabel("Доступные звуки:"))
+            
+            self.sounds_model = QStandardItemModel()
+            self.sounds_list = QListView()
+            self.sounds_list.setModel(self.sounds_model)
+            self.sounds_list.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+            
+            layout.addWidget(self.sounds_list)
+            
+            # Привязка звуков к ID подарков
+            layout.addWidget(QLabel("Привязка звуков к ID подарков:"))
+            
+            mapping_layout = QHBoxLayout()
+            
+            self.gift_id_input = QSpinBox()
+            self.gift_id_input.setRange(1, 999999)
+            
+            self.sound_combo = QComboBox()
+            
+            self.add_mapping_btn = QPushButton("Добавить")
+            self.add_mapping_btn.clicked.connect(self.add_sound_mapping)
+            
+            mapping_layout.addWidget(QLabel("ID подарка:"))
+            mapping_layout.addWidget(self.gift_id_input)
+            mapping_layout.addWidget(QLabel("Звук:"))
+            mapping_layout.addWidget(self.sound_combo, 1)
+            mapping_layout.addWidget(self.add_mapping_btn)
+            
+            layout.addLayout(mapping_layout)
+            
+            # Список привязок звуков
+            layout.addWidget(QLabel("Текущие привязки:"))
+            
+            self.mappings_model = QStandardItemModel()
+            self.mappings_list = QListView()
+            self.mappings_list.setModel(self.mappings_model)
+            self.mappings_list.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+            
+            layout.addWidget(self.mappings_list)
+            
+            # Обновляем списки
+            self.update_sounds_list()
+            self.update_mappings_list()
+            
+            tab.setLayout(layout)
+            return tab
+        except Exception as e:
+            self.logger.error(f"Ошибка при создании вкладки звуков: {str(e)}", exc_info=True)
+            self.error_handler.show_error_dialog(self, "Ошибка создания интерфейса", 
+                                              "Не удалось создать вкладку звуков", str(e))
+            # В случае ошибки возвращаем пустой виджет
+            return QWidget()
+        def bind_events(self):
+        """Привязывает обработчики событий к изменениям ViewModel"""
+        try:
+            self.viewmodel.add_callback('is_monitoring', self.update_monitoring_state)
+            self.viewmodel.add_callback('item_list', self.update_events_table)
+        except Exception as e:
+            self.logger.error(f"Ошибка при привязке обработчиков событий: {str(e)}", exc_info=True)
+            self.error_handler.show_error_dialog(self, "Ошибка инициализации", 
+                                            "Не удалось привязать обработчики событий", str(e))
     
-    def update_ui(self):
-        """Обновляет UI по таймеру"""
-        # Обновление таблицы событий происходит по уведомлениям от ViewModel
-        pass
-    
-    def update_stream(self, text):
-        """Обновляет ID стрима в ViewModel"""
-        self.viewmodel.stream = text
-    
-    def update_notify_gift(self, state):
-        """Обновляет настройку звукового оповещения о донатах"""
-        self.viewmodel.notify_gift = (state == Qt.CheckState.Checked)
-    
-    def update_speech_gift(self, state):
-        """Обновляет настройку озвучивания донатов"""
-        self.viewmodel.speech_gift = (state == Qt.CheckState.Checked)
-    
-    def update_speech_like(self, state):
-        """Обновляет настройку озвучивания лайков"""
-        self.viewmodel.speech_like = (state == Qt.CheckState.Checked)
-    
-    def update_speech_member(self, state):
-        """Обновляет настройку озвучивания подключений"""
-        self.viewmodel.speech_member = (state == Qt.CheckState.Checked)
-    
-    def toggle_monitoring(self):
-        """Включает или выключает мониторинг"""
-        if not self.viewmodel.stream:
-            QMessageBox.warning(self, "Ошибка", "Пожалуйста, укажите ID стрима")
-            return
-        
-        self.viewmodel.start_monitoring()
-    
-    def update_monitoring_button(self):
-        """Обновляет текст кнопки мониторинга"""
-        if self.viewmodel.is_monitoring:
-            self.monitor_btn.setText("Остановить мониторинг")
-            self.monitor_btn.setStyleSheet("background-color: #ffaaaa;")
-        elif self.viewmodel.is_processing:
-            self.monitor_btn.setText("Подключение...")
-            self.monitor_btn.setEnabled(False)
-        else:
-            self.monitor_btn.setText("Начать мониторинг")
-            self.monitor_btn.setStyleSheet("")
-            self.monitor_btn.setEnabled(True)
+    def update_monitoring_state(self):
+        """Обновляет состояние интерфейса в зависимости от статуса мониторинга"""
+        try:
+            if self.viewmodel.is_processing:
+                self.toggle_btn.setEnabled(False)
+                self.status_label.setText("Статус: Подключение...")
+            elif self.viewmodel.is_monitoring:
+                self.toggle_btn.setText("Остановить мониторинг")
+                self.toggle_btn.setEnabled(True)
+                self.status_label.setText(f"Статус: Мониторинг стрима {self.viewmodel.stream}")
+                self.stream_input.setEnabled(False)
+            else:
+                self.toggle_btn.setText("Начать мониторинг")
+                self.toggle_btn.setEnabled(True)
+                self.status_label.setText("Статус: Готов к мониторингу")
+                self.stream_input.setEnabled(True)
+        except Exception as e:
+            self.logger.error(f"Ошибка при обновлении состояния мониторинга: {str(e)}", exc_info=True)
+            self.error_handler.show_error_dialog(self, "Ошибка обновления интерфейса", 
+                                            "Не удалось обновить состояние интерфейса", str(e))
     
     def update_events_table(self):
         """Обновляет таблицу событий"""
-        self.events_table.setRowCount(len(self.viewmodel.item_list))
-        
-        for i, item in enumerate(self.viewmodel.item_list):
-            # Время
-            time_item = QTableWidgetItem(item.timestamp.strftime("%H:%M:%S"))
-            self.events_table.setItem(i, 0, time_item)
+        try:
+            self.table_model.layoutChanged.emit()
+        except Exception as e:
+            self.logger.error(f"Ошибка при обновлении таблицы событий: {str(e)}", exc_info=True)
+            self.error_handler.show_error_dialog(self, "Ошибка обновления таблицы", 
+                                            "Не удалось обновить таблицу событий", str(e))
+    
+    def toggle_monitoring(self):
+        """Включает или выключает мониторинг"""
+        try:
+            if self.viewmodel.is_monitoring:
+                self.logger.info("Остановка мониторинга")
+                self.viewmodel.stop_monitoring()
+                return
             
-            # Пользователь
-            user_item = QTableWidgetItem(item.name)
-            self.events_table.setItem(i, 1, user_item)
+            # Получаем ID стрима из поля ввода
+            stream = self.stream_input.text().strip()
             
-            # Событие
-            event_item = QTableWidgetItem(item.event)
-            self.events_table.setItem(i, 2, event_item)
+            if not stream:
+                self.logger.warning("Попытка начать мониторинг без указания ID стрима")
+                self.error_handler.show_validation_error(self, "Пожалуйста, укажите ID стрима")
+                return
             
-            # Подсветка важных событий
-            if item.alert_level == AlertLevel.IMPORTANT:
-                for col in range(3):
-                    cell_item = self.events_table.item(i, col)
-                    cell_item.setBackground(Qt.GlobalColor.yellow)
+            # Обновляем ID стрима в модели и запускаем мониторинг
+            self.logger.info(f"Начало мониторинга стрима: {stream}")
+            self.viewmodel.stream = stream
+            self.viewmodel.start_monitoring()
+        except Exception as e:
+            self.logger.error(f"Ошибка при переключении мониторинга: {str(e)}", exc_info=True)
+            self.error_handler.show_error_dialog(self, "Ошибка мониторинга", 
+                                            "Не удалось изменить состояние мониторинга", str(e))
+    
+    def toggle_notify_gift(self):
+        """Включает или выключает звуковые оповещения о подарках"""
+        try:
+            self.viewmodel.notify_gift = self.notify_chk.isChecked()
+        except Exception as e:
+            self.logger.error(f"Ошибка при изменении настройки звуковых оповещений: {str(e)}", exc_info=True)
+            self.error_handler.show_error_dialog(self, "Ошибка настроек", 
+                                            "Не удалось изменить настройку звуковых оповещений", str(e))
+    
+    def toggle_speech_gift(self):
+        """Включает или выключает озвучивание подарков"""
+        try:
+            self.viewmodel.speech_gift = self.speech_gift_chk.isChecked()
+        except Exception as e:
+            self.logger.error(f"Ошибка при изменении настройки озвучивания подарков: {str(e)}", exc_info=True)
+            self.error_handler.show_error_dialog(self, "Ошибка настроек", 
+                                            "Не удалось изменить настройку озвучивания подарков", str(e))
+    
+    def toggle_speech_like(self):
+        """Включает или выключает озвучивание лайков"""
+        try:
+            self.viewmodel.speech_like = self.speech_like_chk.isChecked()
+        except Exception as e:
+            self.logger.error(f"Ошибка при изменении настройки озвучивания лайков: {str(e)}", exc_info=True)
+            self.error_handler.show_error_dialog(self, "Ошибка настроек", 
+                                            "Не удалось изменить настройку озвучивания лайков", str(e))
+    
+    def toggle_speech_member(self):
+        """Включает или выключает озвучивание подключений"""
+        try:
+            self.viewmodel.speech_member = self.speech_member_chk.isChecked()
+        except Exception as e:
+            self.logger.error(f"Ошибка при изменении настройки озвучивания подключений: {str(e)}", exc_info=True)
+            self.error_handler.show_error_dialog(self, "Ошибка настроек", 
+                                            "Не удалось изменить настройку озвучивания подключений", str(e))
     
     def save_settings(self):
         """Сохраняет настройки"""
-        # Голос
-        selected_voice = self.voice_combo.currentText()
-        if selected_voice:
-            self.viewmodel.settings.speech_voice = selected_voice
-        
-        # Скорость речи
-        self.viewmodel.settings.speech_rate = self.rate_slider.value()
-        
-        # Тексты
-        self.viewmodel.settings.join_text = self.join_text_input.text()
-        self.viewmodel.settings.like_text = self.like_text_input.text()
-        
-        # Задержка звуковых уведомлений
-        self.viewmodel.settings.notify_delay = self.delay_input.value()
-        
-        # Сохраняем настройки
-        self.viewmodel.settings.save()
-        
-        QMessageBox.information(self, "Настройки", "Настройки успешно сохранены")
+        try:
+            # Валидация данных
+            if self.join_text_input.text().strip() == "":
+                self.error_handler.show_validation_error(self, "Текст для подключения не может быть пустым")
+                return
+            
+            if self.like_text_input.text().strip() == "":
+                self.error_handler.show_validation_error(self, "Текст для лайка не может быть пустым")
+                return
+            
+            # Голос
+            selected_voice = self.voice_combo.currentText()
+            if selected_voice:
+                self.viewmodel.settings.speech_voice = selected_voice
+            
+            # Скорость речи
+            self.viewmodel.settings.speech_rate = self.rate_slider.value()
+            
+            # Тексты
+            self.viewmodel.settings.join_text = self.join_text_input.text()
+            self.viewmodel.settings.like_text = self.like_text_input.text()
+            
+            # Задержка звуковых уведомлений
+            self.viewmodel.settings.notify_delay = self.delay_input.value()
+            
+            # Сохраняем настройки
+            self.viewmodel.settings.save()
+            self.logger.info("Настройки успешно сохранены")
+            
+            QMessageBox.information(self, "Настройки", "Настройки успешно сохранены")
+        except Exception as e:
+            self.logger.error(f"Ошибка при сохранении настроек: {str(e)}", exc_info=True)
+            self.error_handler.show_error_dialog(self, "Ошибка сохранения настроек", 
+                                            "Не удалось сохранить настройки", str(e))
     
-    def update_sound_combo(self):
+    def update_sounds_list(self):
         """Обновляет список доступных звуков"""
-        self.sound_combo.clear()
-        sounds = self.viewmodel.sound_service.sound_list()
-        if sounds:
-            self.sound_combo.addItems(sounds)
+        try:
+            self.sounds_model.clear()
+            self.sound_combo.clear()
+            
+            if not os.path.exists("assets"):
+                os.makedirs("assets")
+                self.logger.info("Создана директория assets")
+            
+            # Получаем список звуковых файлов
+            sound_files = [f for f in os.listdir("assets") if f.lower().endswith(('.mp3', '.wav'))]
+            
+            for sound in sound_files:
+                self.sounds_model.appendRow(QStandardItem(sound))
+                self.sound_combo.addItem(sound)
+            
+            self.logger.debug(f"Обновлен список звуков: {len(sound_files)} файлов")
+        except Exception as e:
+            self.logger.error(f"Ошибка при обновлении списка звуков: {str(e)}", exc_info=True)
+            self.error_handler.handle_file_error(self, e, "assets")
     
-    def update_sounds_table(self):
-        """Обновляет таблицу привязок звуков к ID подарков"""
-        # Очищаем таблицу
-        self.sounds_table.setRowCount(0)
-        
-        # Получаем список привязок
-        sound_mappings = self.viewmodel.sound_service.play_list()
-        
-        # Заполняем таблицу
-        for i, (gift_id, sound_file) in enumerate(sound_mappings):
-            self.sounds_table.insertRow(i)
+    def update_mappings_list(self):
+        """Обновляет список привязок звуков к ID подарков"""
+        try:
+            self.mappings_model.clear()
             
-            # ID подарка
-            id_item = QTableWidgetItem(str(gift_id))
-            self.sounds_table.setItem(i, 0, id_item)
+            # Получаем текущие привязки
+            mappings = self.viewmodel.sound_service.get_mappings()
             
-            # Название звукового файла
-            sound_item = QTableWidgetItem(sound_file)
-            self.sounds_table.setItem(i, 1, sound_item)
+            for gift_id, sound_file in mappings.items():
+                self.mappings_model.appendRow(
+                    QStandardItem(f"ID {gift_id}: {sound_file}")
+                )
             
-            # Кнопки действий
-            actions_widget = QWidget()
-            actions_layout = QHBoxLayout(actions_widget)
-            actions_layout.setContentsMargins(0, 0, 0, 0)
-            
-            # Кнопка воспроизведения
-            play_btn = QPushButton("▶")
-            play_btn.setMaximumWidth(30)
-            play_btn.clicked.connect(lambda _, s=sound_file: self.play_sound(s))
-            
-            # Кнопка удаления
-            delete_btn = QPushButton("✕")
-            delete_btn.setMaximumWidth(30)
-            delete_btn.clicked.connect(lambda _, gid=gift_id: self.remove_sound_mapping(gid))
-            
-            actions_layout.addWidget(play_btn)
-            actions_layout.addWidget(delete_btn)
-            
-            self.sounds_table.setCellWidget(i, 2, actions_widget)
+            self.logger.debug(f"Обновлен список привязок: {len(mappings)} привязок")
+        except Exception as e:
+            self.logger.error(f"Ошибка при обновлении списка привязок: {str(e)}", exc_info=True)
+            self.error_handler.show_error_dialog(self, "Ошибка обновления списка", 
+                                            "Не удалось обновить список привязок", str(e))
     
-    def play_sound(self, sound_file):
-        """Воспроизводит выбранный звук"""
-        # Используем звуковой сервис для воспроизведения
-        # Здесь мы используем временный ID -1, который не будет сохраняться
-        self.viewmodel.sound_service.play(-1, 0)  # Задержка 0 мс для немедленного воспроизведения
+    def upload_sound(self):
+        """Загружает новый звуковой файл"""
+        try:
+            file_path, _ = QFileDialog.getOpenFileName(
+                self, "Выберите звуковой файл", "", "Аудио файлы (*.mp3 *.wav)"
+            )
+            
+            if not file_path:
+                return
+            
+            # Копируем файл в директорию assets
+            file_name = os.path.basename(file_path)
+            destination = os.path.join("assets", file_name)
+            
+            try:
+                # Проверяем, существует ли директория assets
+                if not os.path.exists("assets"):
+                    os.makedirs("assets")
+                
+                # Копируем файл
+                import shutil
+                shutil.copy2(file_path, destination)
+                
+                self.logger.info(f"Звуковой файл загружен: {file_name}")
+                
+                # Обновляем списки
+                self.update_sounds_list()
+                
+                QMessageBox.information(self, "Загрузка звука", f"Файл {file_name} успешно загружен")
+            except Exception as e:
+                self.logger.error(f"Ошибка при копировании звукового файла: {str(e)}", exc_info=True)
+                self.error_handler.handle_file_error(self, e, destination)
+        except Exception as e:
+            self.logger.error(f"Ошибка при загрузке звука: {str(e)}", exc_info=True)
+            self.error_handler.show_error_dialog(self, "Ошибка загрузки звука", 
+                                            "Не удалось загрузить звуковой файл", str(e))
     
     def add_sound_mapping(self):
         """Добавляет новую привязку звука к ID подарка"""
-        gift_id = self.gift_id_input.value()
-        sound_file = self.sound_combo.currentText()
-        
-        if not sound_file:
-            QMessageBox.warning(self, "Ошибка", "Звуковой файл не выбран")
-            return
-        
-        # Добавляем привязку
-        self.viewmodel.sound_service.update(gift_id, sound_file)
-        
-        # Обновляем таблицу
-        self.update_sounds_table()
-    
-    def remove_sound_mapping(self, gift_id):
-        """Удаляет привязку звука к ID подарка"""
-        # В SoundService нет метода для удаления, поэтому обновляем на пустое значение
-        self.viewmodel.sound_service.update(gift_id, "")
-        
-        # Обновляем таблицу
-        self.update_sounds_table()
+        try:
+            gift_id = self.gift_id_input.value()
+            sound_file = self.sound_combo.currentText()
+            
+            if not sound_file:
+                self.error_handler.show_validation_error(self, "Пожалуйста, выберите звуковой файл")
+                return
+            
+            # Добавляем привязку
+            self.viewmodel.sound_service.add_mapping(gift_id, sound_file)
+            self.logger.info(f"Добавлена привязка звука: ID {gift_id} -> {sound_file}")
+            
+            # Обновляем список привязок
+            self.update_mappings_list()
+            
+            QMessageBox.information(
+                self, 
+                "Привязка звука", 
+                f"Подарок с ID {gift_id} теперь будет сопровождаться звуком {sound_file}"
+            )
+        except Exception as e:
+            self.logger.error(f"Ошибка при добавлении привязки звука: {str(e)}", exc_info=True)
+            self.error_handler.show_error_dialog(self, "Ошибка привязки звука", 
+                                            "Не удалось привязать звук к ID подарка", str(e))
