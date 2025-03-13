@@ -1,5 +1,5 @@
 @echo off
-chcp 866 > nul
+chcp 65001 > nul
 setlocal enabledelayedexpansion
 title TikTok Streamer Launcher
 
