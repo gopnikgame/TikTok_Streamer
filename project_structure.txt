@@ -1,0 +1,20 @@
+telegram-publisher-bot/
+├── app/
+│   ├── __init__.py
+│   ├── __main__.py
+│   ├── bot.py
+│   ├── config.py
+│   ├── html.py
+│   └── utils.py
+├── docker/
+│   └── docker-compose.yml
+├── logs/
+├── scripts/
+│   └── manage_bot.sh
+├── .dockerignore
+├── .env
+├── .env.example
+├── .gitignore
+├── Dockerfile
+├── README.md
+└── requirements.txt
