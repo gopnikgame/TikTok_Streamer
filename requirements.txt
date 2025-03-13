@@ -1,4 +1,5 @@
-python-telegram-bot>=20.0
-python-dotenv>=1.0.0
-requests>=2.28.2
-emoji>=2.2.0
+TikTokLive==5.0.5
+pyttsx3==2.90
+PyQt6==6.6.0
+pygame==2.5.2
+pillow==10.1.0
