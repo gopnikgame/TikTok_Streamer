@@ -99,7 +99,7 @@ TikTokLive>=5.0.0
 aiohttp>=3.8.0
 requests>=2.28.0
 python-logging-loki>=0.3.1
-"@ | Out-File -FilePath "requirements.txt" -Encoding utf8
+"@ | Out-File -FilePath "requirements.txt" -Encoding utf8NoBOM
     
     Write-Host "[+] Файл requirements.txt создан." -ForegroundColor Green
 }
