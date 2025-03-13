@@ -7,6 +7,7 @@ from TikTokLive.types.events import GiftEvent, LikeEvent, JoinEvent, ConnectEven
 from models.data_models import TableItemView, AlertLevel
 from utils.settings import Settings
 from utils.logger import Logger
+from utils.error_handler import ErrorHandler
 
 class Observable:
     def __init__(self):
@@ -32,6 +33,7 @@ class MonitoringViewModel(Observable):
         self.sound_service = sound_service
         self.gift_service = gift_service
         self.settings = Settings()
+        self.error_handler = ErrorHandler()
         
         # Свойства для привязки к UI
         self._is_monitoring = False
@@ -100,8 +102,8 @@ class MonitoringViewModel(Observable):
             self.settings.save()
             self.logger.debug(f"Настройка звуковых оповещений изменена: {value}")
             self.notify_property_changed('notify_gift')
-    
-    @property
+            
+        @property
     def speech_gift(self):
         return self._speech_gift
         
@@ -147,7 +149,8 @@ class MonitoringViewModel(Observable):
             self.item_list.pop()
         self.logger.debug(f"Добавлено событие: {item.timestamp} - {item.name} - {item.event}")
         self.notify_property_changed('item_list')
-        def start_monitoring(self):
+
+    def start_monitoring(self):
         """Запускает мониторинг стрима TikTok"""
         if self.is_monitoring:
             self.logger.info("Остановка мониторинга текущего стрима")
@@ -156,6 +159,7 @@ class MonitoringViewModel(Observable):
         
         if not self.stream:
             self.logger.warning("Попытка запуска мониторинга без указанного ID стрима")
+            self.error_handler.show_validation_error(None, "Пожалуйста, укажите ID стрима TikTok")
             return
         
         self.logger.info(f"Запуск мониторинга стрима: {self.stream}")
@@ -166,7 +170,19 @@ class MonitoringViewModel(Observable):
         # Запускаем клиент TikTok в отдельном потоке
         threading.Thread(target=self._run_tiktok_client, daemon=True).start()
     
-    def _run_tiktok_client(self):
+    def stop_monitoring(self):
+        """Останавливает мониторинг стрима"""
+        if self.client and self.client.connected:
+            try:
+                self.logger.info("Остановка мониторинга стрима")
+                asyncio.run_coroutine_threadsafe(self.client.stop(), self.loop)
+            except Exception as e:
+                self.logger.error(f"Ошибка при остановке клиента: {str(e)}")
+                self.error_handler.handle_tiktok_error(None, e)
+        
+        self.is_monitoring = False
+        self.logger.info("Мониторинг остановлен")
+        def _run_tiktok_client(self):
         """Запускает клиент TikTok Live в отдельном потоке"""
         try:
             self.logger.debug("Создание нового event loop для TikTok клиента")
@@ -215,81 +231,90 @@ class MonitoringViewModel(Observable):
             async def on_gift(event: GiftEvent):
                 self.logger.info(f"Получен подарок {event.gift.name} от {event.user.nickname}")
                 
-                # Создаем запись о событии
-                item = TableItemView(
-                    timestamp=datetime.now(),
-                    name=event.user.nickname,
-                    event=f"донат {event.gift.name}",
-                    alert_level=AlertLevel.IMPORTANT
-                )
-                
-                # Добавляем в список для UI
-                self.add_item(item)
-                
-                # Озвучиваем и проигрываем звук, если включено
-                if self.speech_gift:
-                    self.logger.debug(f"Озвучивание подарка от {event.user.nickname}")
-                    self.speech_service.speech(
-                        f"{event.user.nickname} прислал {event.gift.name}",
-                        self.settings.speech_voice,
-                        self.settings.speech_rate
+                try:
+                    # Создаем запись о событии
+                    item = TableItemView(
+                        timestamp=datetime.now(),
+                        name=event.user.nickname,
+                        event=f"донат {event.gift.name}",
+                        alert_level=AlertLevel.IMPORTANT
                     )
-                
-                if self.notify_gift:
-                    self.logger.debug(f"Воспроизведение звука для подарка ID {event.gift.id}")
-                    self.sound_service.play(event.gift.id, self.settings.notify_delay)
+                    
+                    # Добавляем в список для UI
+                    self.add_item(item)
+                    
+                    # Озвучиваем и проигрываем звук, если включено
+                    if self.speech_gift:
+                        self.logger.debug(f"Озвучивание подарка от {event.user.nickname}")
+                        self.speech_service.speech(
+                            f"{event.user.nickname} прислал {event.gift.name}",
+                            self.settings.speech_voice,
+                            self.settings.speech_rate
+                        )
+                    
+                    if self.notify_gift:
+                        self.logger.debug(f"Воспроизведение звука для подарка ID {event.gift.id}")
+                        self.sound_service.play(event.gift.id, self.settings.notify_delay)
+                except Exception as e:
+                    self.logger.error(f"Ошибка при обработке подарка: {str(e)}", exc_info=True)
             
             # Обработчик лайков
             @self.client.on("like")
             async def on_like(event: LikeEvent):
                 self.logger.debug(f"Получен лайк от {event.user.nickname}")
                 
-                # Создаем запись о событии
-                item = TableItemView(
-                    timestamp=datetime.now(),
-                    name=event.user.nickname,
-                    event="лайк",
-                    alert_level=AlertLevel.NORMAL
-                )
-                
-                # Добавляем в список для UI
-                self.add_item(item)
-                
-                # Озвучиваем, если включено
-                if self.speech_like:
-                    like_text = self.settings.like_text.replace("@name", event.user.nickname)
-                    self.logger.debug(f"Озвучивание лайка: {like_text}")
-                    self.speech_service.speech(
-                        like_text,
-                        self.settings.speech_voice,
-                        self.settings.speech_rate
+                try:
+                    # Создаем запись о событии
+                    item = TableItemView(
+                        timestamp=datetime.now(),
+                        name=event.user.nickname,
+                        event="лайк",
+                        alert_level=AlertLevel.NORMAL
                     )
+                    
+                    # Добавляем в список для UI
+                    self.add_item(item)
+                    
+                    # Озвучиваем, если включено
+                    if self.speech_like:
+                        like_text = self.settings.like_text.replace("@name", event.user.nickname)
+                        self.logger.debug(f"Озвучивание лайка: {like_text}")
+                        self.speech_service.speech(
+                            like_text,
+                            self.settings.speech_voice,
+                            self.settings.speech_rate
+                        )
+                except Exception as e:
+                    self.logger.error(f"Ошибка при обработке лайка: {str(e)}", exc_info=True)
             
             # Обработчик новых участников
             @self.client.on("join")
             async def on_join(event: JoinEvent):
                 self.logger.debug(f"Новое подключение: {event.user.nickname}")
                 
-                # Создаем запись о событии
-                item = TableItemView(
-                    timestamp=datetime.now(),
-                    name=event.user.nickname,
-                    event="подключение",
-                    alert_level=AlertLevel.NORMAL
-                )
-                
-                # Добавляем в список для UI
-                self.add_item(item)
-                
-                # Озвучиваем, если включено
-                if self.speech_member:
-                    join_text = self.settings.join_text.replace("@name", event.user.nickname)
-                    self.logger.debug(f"Озвучивание подключения: {join_text}")
-                    self.speech_service.speech(
-                        join_text,
-                        self.settings.speech_voice,
-                        self.settings.speech_rate
+                try:
+                    # Создаем запись о событии
+                    item = TableItemView(
+                        timestamp=datetime.now(),
+                        name=event.user.nickname,
+                        event="подключение",
+                        alert_level=AlertLevel.NORMAL
                     )
+                    
+                    # Добавляем в список для UI
+                    self.add_item(item)
+                    
+                    # Озвучиваем, если включено
+                    if self.speech_member:
+                        join_text = self.settings.join_text.replace("@name", event.user.nickname)
+                        self.logger.debug(f"Озвучивание подключения: {join_text}")
+                        self.speech_service.speech(
+                            join_text,
+                            self.settings.speech_voice,
+                            self.settings.speech_rate
+                        )
+                except Exception as e:
+                    self.logger.error(f"Ошибка при обработке подключения: {str(e)}", exc_info=True)
             
             # Запускаем клиент и ждем завершения
             self.logger.info("Запуск клиента TikTok Live")
@@ -308,6 +333,9 @@ class MonitoringViewModel(Observable):
             )
             self.add_item(item)
             
+            # Обрабатываем ошибку через ErrorHandler
+            self.error_handler.handle_tiktok_error(None, e)
+            
             self.is_monitoring = False
             self.is_processing = False
         
@@ -317,21 +345,16 @@ class MonitoringViewModel(Observable):
                 try:
                     self.logger.debug("Закрытие клиента TikTok")
                     self.loop.run_until_complete(self.client.stop())
-                except:
-                    self.logger.error("Ошибка при закрытии клиента TikTok")
+                except Exception as e:
+                    self.logger.error(f"Ошибка при закрытии клиента TikTok: {str(e)}")
+                    self.error_handler.show_error_dialog(None, "Ошибка", 
+                                                      "Ошибка при закрытии клиента TikTok", str(e))
             
             if self.loop and self.loop.is_running():
                 self.logger.debug("Закрытие event loop")
-                self.loop.close()
-    
-    def stop_monitoring(self):
-        """Останавливает мониторинг стрима"""
-        if self.client and self.client.connected:
-            try:
-                self.logger.info("Остановка мониторинга стрима")
-                asyncio.run_coroutine_threadsafe(self.client.stop(), self.loop)
-            except Exception as e:
-                self.logger.error(f"Ошибка при остановке клиента: {str(e)}")
-        
-        self.is_monitoring = False
-        self.logger.info("Мониторинг остановлен")
+                try:
+                    self.loop.close()
+                except Exception as e:
+                    self.logger.error(f"Ошибка при закрытии event loop: {str(e)}")
+                    self.error_handler.show_error_dialog(None, "Ошибка", 
+                                                      "Ошибка при закрытии event loop", str(e))
