@@ -98,6 +98,10 @@ class MainWindow(QMainWindow):
         voice_label = QLabel("Голос:")
         self.voice_combo = QComboBox()
         self.voice_combo.addItems(self.viewmodel.speech_service.get_voices())
+        if self.viewmodel.settings.speech_voice:
+            index = self.voice_combo.findText(self.viewmodel.settings.speech_voice)
+            if index >= 0:
+                self.voice_combo.setCurrentIndex(index)
         voice_layout.addWidget(voice_label)
         voice_layout.addWidget(self.voice_combo)
         speech_group_layout.addLayout(voice_layout)
@@ -156,8 +160,7 @@ class MainWindow(QMainWindow):
         
         tab.setLayout(layout)
         return tab
-    
-    def create_sound_tab(self):
+        def create_sound_tab(self):
         """Создает вкладку настроек звуков"""
         tab = QWidget()
         layout = QVBoxLayout()
