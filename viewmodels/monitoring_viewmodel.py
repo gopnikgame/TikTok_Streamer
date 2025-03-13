@@ -147,3 +147,191 @@ class MonitoringViewModel(Observable):
             self.item_list.pop()
         self.logger.debug(f"Добавлено событие: {item.timestamp} - {item.name} - {item.event}")
         self.notify_property_changed('item_list')
+        def start_monitoring(self):
+        """Запускает мониторинг стрима TikTok"""
+        if self.is_monitoring:
+            self.logger.info("Остановка мониторинга текущего стрима")
+            self.stop_monitoring()
+            return
+        
+        if not self.stream:
+            self.logger.warning("Попытка запуска мониторинга без указанного ID стрима")
+            return
+        
+        self.logger.info(f"Запуск мониторинга стрима: {self.stream}")
+        self.is_processing = True
+        self.item_list.clear()
+        self.notify_property_changed('item_list')
+        
+        # Запускаем клиент TikTok в отдельном потоке
+        threading.Thread(target=self._run_tiktok_client, daemon=True).start()
+    
+    def _run_tiktok_client(self):
+        """Запускает клиент TikTok Live в отдельном потоке"""
+        try:
+            self.logger.debug("Создание нового event loop для TikTok клиента")
+            # Создаем новый event loop для асинхронного кода
+            self.loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(self.loop)
+            
+            # Создаем клиент и регистрируем обработчики событий
+            self.logger.debug(f"Инициализация TikTokLiveClient для {self.stream}")
+            self.client = TikTokLiveClient(self.stream)
+            
+            # Обработчик подключения
+            @self.client.on("connect")
+            async def on_connect(_: ConnectEvent):
+                self.logger.info(f"Подключено к стриму {self.stream}")
+                self.is_monitoring = True
+                self.is_processing = False
+                
+                # Добавляем событие о подключении
+                item = TableItemView(
+                    timestamp=datetime.now(),
+                    name="Система",
+                    event=f"Подключено к стриму {self.stream}",
+                    alert_level=AlertLevel.NORMAL
+                )
+                self.add_item(item)
+            
+            # Обработчик отключения
+            @self.client.on("disconnect")
+            async def on_disconnect(_: DisconnectEvent):
+                self.logger.info(f"Отключено от стрима {self.stream}")
+                self.is_monitoring = False
+                self.is_processing = False
+                
+                # Добавляем событие об отключении
+                item = TableItemView(
+                    timestamp=datetime.now(),
+                    name="Система",
+                    event=f"Отключено от стрима {self.stream}",
+                    alert_level=AlertLevel.NORMAL
+                )
+                self.add_item(item)
+                
+            # Обработчик подарков
+            @self.client.on("gift")
+            async def on_gift(event: GiftEvent):
+                self.logger.info(f"Получен подарок {event.gift.name} от {event.user.nickname}")
+                
+                # Создаем запись о событии
+                item = TableItemView(
+                    timestamp=datetime.now(),
+                    name=event.user.nickname,
+                    event=f"донат {event.gift.name}",
+                    alert_level=AlertLevel.IMPORTANT
+                )
+                
+                # Добавляем в список для UI
+                self.add_item(item)
+                
+                # Озвучиваем и проигрываем звук, если включено
+                if self.speech_gift:
+                    self.logger.debug(f"Озвучивание подарка от {event.user.nickname}")
+                    self.speech_service.speech(
+                        f"{event.user.nickname} прислал {event.gift.name}",
+                        self.settings.speech_voice,
+                        self.settings.speech_rate
+                    )
+                
+                if self.notify_gift:
+                    self.logger.debug(f"Воспроизведение звука для подарка ID {event.gift.id}")
+                    self.sound_service.play(event.gift.id, self.settings.notify_delay)
+            
+            # Обработчик лайков
+            @self.client.on("like")
+            async def on_like(event: LikeEvent):
+                self.logger.debug(f"Получен лайк от {event.user.nickname}")
+                
+                # Создаем запись о событии
+                item = TableItemView(
+                    timestamp=datetime.now(),
+                    name=event.user.nickname,
+                    event="лайк",
+                    alert_level=AlertLevel.NORMAL
+                )
+                
+                # Добавляем в список для UI
+                self.add_item(item)
+                
+                # Озвучиваем, если включено
+                if self.speech_like:
+                    like_text = self.settings.like_text.replace("@name", event.user.nickname)
+                    self.logger.debug(f"Озвучивание лайка: {like_text}")
+                    self.speech_service.speech(
+                        like_text,
+                        self.settings.speech_voice,
+                        self.settings.speech_rate
+                    )
+            
+            # Обработчик новых участников
+            @self.client.on("join")
+            async def on_join(event: JoinEvent):
+                self.logger.debug(f"Новое подключение: {event.user.nickname}")
+                
+                # Создаем запись о событии
+                item = TableItemView(
+                    timestamp=datetime.now(),
+                    name=event.user.nickname,
+                    event="подключение",
+                    alert_level=AlertLevel.NORMAL
+                )
+                
+                # Добавляем в список для UI
+                self.add_item(item)
+                
+                # Озвучиваем, если включено
+                if self.speech_member:
+                    join_text = self.settings.join_text.replace("@name", event.user.nickname)
+                    self.logger.debug(f"Озвучивание подключения: {join_text}")
+                    self.speech_service.speech(
+                        join_text,
+                        self.settings.speech_voice,
+                        self.settings.speech_rate
+                    )
+            
+            # Запускаем клиент и ждем завершения
+            self.logger.info("Запуск клиента TikTok Live")
+            self.client_task = self.loop.create_task(self.client.start())
+            self.loop.run_until_complete(self.client_task)
+        
+        except Exception as e:
+            self.logger.error(f"Ошибка при подключении к TikTok: {str(e)}", exc_info=True)
+            
+            # Добавляем событие об ошибке
+            item = TableItemView(
+                timestamp=datetime.now(),
+                name="Система",
+                event=f"Ошибка: {str(e)}",
+                alert_level=AlertLevel.IMPORTANT
+            )
+            self.add_item(item)
+            
+            self.is_monitoring = False
+            self.is_processing = False
+        
+        finally:
+            # Закрываем клиент и loop при завершении
+            if self.client and self.client.connected:
+                try:
+                    self.logger.debug("Закрытие клиента TikTok")
+                    self.loop.run_until_complete(self.client.stop())
+                except:
+                    self.logger.error("Ошибка при закрытии клиента TikTok")
+            
+            if self.loop and self.loop.is_running():
+                self.logger.debug("Закрытие event loop")
+                self.loop.close()
+    
+    def stop_monitoring(self):
+        """Останавливает мониторинг стрима"""
+        if self.client and self.client.connected:
+            try:
+                self.logger.info("Остановка мониторинга стрима")
+                asyncio.run_coroutine_threadsafe(self.client.stop(), self.loop)
+            except Exception as e:
+                self.logger.error(f"Ошибка при остановке клиента: {str(e)}")
+        
+        self.is_monitoring = False
+        self.logger.info("Мониторинг остановлен")
