@@ -320,4 +320,71 @@ class MainWindow(QMainWindow):
         if sounds:
             self.sound_combo.addItems(sounds)
     
+    def update_sounds_table(self):
+        """Обновляет таблицу привязок звуков к ID подарков"""
+        # Очищаем таблицу
+        self.sounds_table.setRowCount(0)
+        
+        # Получаем список привязок
+        sound_mappings = self.viewmodel.sound_service.play_list()
+        
+        # Заполняем таблицу
+        for i, (gift_id, sound_file) in enumerate(sound_mappings):
+            self.sounds_table.insertRow(i)
+            
+            # ID подарка
+            id_item = QTableWidgetItem(str(gift_id))
+            self.sounds_table.setItem(i, 0, id_item)
+            
+            # Название звукового файла
+            sound_item = QTableWidgetItem(sound_file)
+            self.sounds_table.setItem(i, 1, sound_item)
+            
+            # Кнопки действий
+            actions_widget = QWidget()
+            actions_layout = QHBoxLayout(actions_widget)
+            actions_layout.setContentsMargins(0, 0, 0, 0)
+            
+            # Кнопка воспроизведения
+            play_btn = QPushButton("▶")
+            play_btn.setMaximumWidth(30)
+            play_btn.clicked.connect(lambda _, s=sound_file: self.play_sound(s))
+            
+            # Кнопка удаления
+            delete_btn = QPushButton("✕")
+            delete_btn.setMaximumWidth(30)
+            delete_btn.clicked.connect(lambda _, gid=gift_id: self.remove_sound_mapping(gid))
+            
+            actions_layout.addWidget(play_btn)
+            actions_layout.addWidget(delete_btn)
+            
+            self.sounds_table.setCellWidget(i, 2, actions_widget)
     
+    def play_sound(self, sound_file):
+        """Воспроизводит выбранный звук"""
+        # Используем звуковой сервис для воспроизведения
+        # Здесь мы используем временный ID -1, который не будет сохраняться
+        self.viewmodel.sound_service.play(-1, 0)  # Задержка 0 мс для немедленного воспроизведения
+    
+    def add_sound_mapping(self):
+        """Добавляет новую привязку звука к ID подарка"""
+        gift_id = self.gift_id_input.value()
+        sound_file = self.sound_combo.currentText()
+        
+        if not sound_file:
+            QMessageBox.warning(self, "Ошибка", "Звуковой файл не выбран")
+            return
+        
+        # Добавляем привязку
+        self.viewmodel.sound_service.update(gift_id, sound_file)
+        
+        # Обновляем таблицу
+        self.update_sounds_table()
+    
+    def remove_sound_mapping(self, gift_id):
+        """Удаляет привязку звука к ID подарка"""
+        # В SoundService нет метода для удаления, поэтому обновляем на пустое значение
+        self.viewmodel.sound_service.update(gift_id, "")
+        
+        # Обновляем таблицу
+        self.update_sounds_table()
