@@ -165,12 +165,30 @@ class MonitoringViewModel(Observable):
             async def on_connect(_: ConnectEvent):
                 self.is_monitoring = True
                 self.is_processing = False
+                
+                # Добавляем событие о подключении
+                item = TableItemView(
+                    timestamp=datetime.now(),
+                    name="Система",
+                    event=f"Подключено к стриму {self.stream}",
+                    alert_level=AlertLevel.NORMAL
+                )
+                self.add_item(item)
             
             # Обработчик отключения
             @self.client.on("disconnect")
             async def on_disconnect(event: DisconnectEvent):
                 self.is_monitoring = False
                 self.is_processing = False
+                
+                # Добавляем событие об отключении
+                item = TableItemView(
+                    timestamp=datetime.now(),
+                    name="Система",
+                    event=f"Отключено от стрима {self.stream}",
+                    alert_level=AlertLevel.NORMAL
+                )
+                self.add_item(item)
                 
             # Обработчик подарков
             @self.client.on("gift")
@@ -249,13 +267,26 @@ class MonitoringViewModel(Observable):
         
         except Exception as e:
             print(f"Ошибка при подключении к TikTok: {e}")
+            
+            # Добавляем событие об ошибке
+            item = TableItemView(
+                timestamp=datetime.now(),
+                name="Система",
+                event=f"Ошибка: {str(e)}",
+                alert_level=AlertLevel.IMPORTANT
+            )
+            self.add_item(item)
+            
             self.is_monitoring = False
             self.is_processing = False
         
         finally:
             # Закрываем клиент и loop при завершении
             if self.client and self.client.connected:
-                self.loop.run_until_complete(self.client.stop())
+                try:
+                    self.loop.run_until_complete(self.client.stop())
+                except:
+                    pass
             
             if self.loop and self.loop.is_running():
                 self.loop.close()
@@ -263,6 +294,9 @@ class MonitoringViewModel(Observable):
     def stop_monitoring(self):
         """Останавливает мониторинг стрима"""
         if self.client and self.client.connected:
-            asyncio.run_coroutine_threadsafe(self.client.stop(), self.loop)
+            try:
+                asyncio.run_coroutine_threadsafe(self.client.stop(), self.loop)
+            except:
+                pass
         
         self.is_monitoring = False
