@@ -1,4 +1,4 @@
-TTStreamerPy/
+TikTok_Streamer/
 ├── app.py              # Точка входа в приложение
 ├── requirements.txt    # Зависимости проекта
 ├── assets/             # Папка для звуков и изображений
