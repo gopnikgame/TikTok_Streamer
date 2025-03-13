@@ -1,9 +1,9 @@
 import sys
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
                              QTabWidget, QLabel, QLineEdit, QPushButton, QCheckBox, 
-                             QTableWidget, QTableWidgetItem, QHeaderView, QMessageBox)
+                             QTableWidget, QTableWidgetItem, QHeaderView, QMessageBox,
+                             QComboBox, QSlider, QSpinBox)
 from PyQt6.QtCore import Qt, QTimer
-
 from viewmodels.monitoring_viewmodel import MonitoringViewModel
 from models.data_models import AlertLevel
 
