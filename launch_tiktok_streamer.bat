@@ -25,17 +25,26 @@ if !ERRORLEVEL! neq 0 (
 )
 
 :: Проверяем версию Python (нужна 3.8 или выше)
-for /f "tokens=2 delims==" %%I in ('python -c "import sys; print(f'major={sys.version_info.major} minor={sys.version_info.minor}')"') do set %%I
+for /f "tokens=2 delims= " %%I in ('python --version 2^>^&1') do set PY_VERSION=%%I
+if "!PY_VERSION!"=="" (
+    echo [-] Не удалось определить версию Python.
+    goto install_python
+)
 
-echo [*] Версия Python: !major!.!minor!
+for /f "tokens=1,2 delims=." %%I in ("!PY_VERSION!") do (
+    set PY_MAJOR=%%I
+    set PY_MINOR=%%J
+)
 
-if !major! LSS 3 (
+echo [*] Версия Python: !PY_MAJOR!.!PY_MINOR!
+
+if !PY_MAJOR! LSS 3 (
     echo [-] Версия Python слишком старая. Требуется Python 3.8 или выше.
     goto install_python
 )
 
-if !major! EQU 3 (
-    if !minor! LSS 8 (
+if !PY_MAJOR! EQU 3 (
+    if !PY_MINOR! LSS 8 (
         echo [-] Версия Python слишком старая. Требуется Python 3.8 или выше.
         goto install_python
     )
@@ -64,6 +73,9 @@ if !ERRORLEVEL! neq 0 (
     pause
     exit /b 1
 )
+
+:: Обновляем переменную PATH для текущей сессии
+set "PATH=%PATH%;%USERPROFILE%\AppData\Local\Programs\Python\Python310\Scripts;%USERPROFILE%\AppData\Local\Programs\Python\Python310"
 
 echo [+] Python 3.10 успешно установлен.
 echo [!] Пожалуйста, перезапустите этот скрипт для продолжения.
@@ -102,7 +114,7 @@ echo [*] Установка зависимостей из requirements.txt...
 python -m pip install -r requirements.txt
 if !ERRORLEVEL! neq 0 (
     echo [-] Ошибка при установке зависимостей.
-    echo [*] Попробуйте установить основные компоненты напрямую...
+    echo [*] Пробуем установить основные компоненты напрямую...
     
     for %%m in (PyQt6 pyttsx3 pygame TikTokLive aiohttp requests) do (
         python -m pip install %%m
