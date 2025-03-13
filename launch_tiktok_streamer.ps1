@@ -62,8 +62,6 @@ if ($installPython) {
         
         # Обновляем переменную PATH для текущей сессии
         $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "User") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "Machine") 
-        
-        # Перезагружаем переменную PATH
         $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Process")
         
         Write-Host "[+] Python 3.10 успешно установлен." -ForegroundColor Green
