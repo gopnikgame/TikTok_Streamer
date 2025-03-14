@@ -100,10 +100,9 @@ if not exist "requirements.txt" (
         echo PyQt6>=6.5.0
         echo pyttsx3>=2.90
         echo pygame>=2.5.0
-        echo TikTokLive>=5.0.0
+        echo TikTokLive>=6.4.4
         echo aiohttp>=3.8.0
         echo requests>=2.28.0
-        echo python-logging-loki>=0.3.1
     ) > requirements.txt
     
     echo [+] Файл requirements.txt создан.
