@@ -24,16 +24,20 @@ if not exist "%SystemRoot%\System32\vcruntime140.dll" (
 )
 
 :: Проверяем наличие файлов api-ms-win-crt*.dll
+:: Правильно инициализируем переменную перед использованием
 set API_MS_DLL_COUNT=0
-for /f "tokens=*" %%a in ('dir /b "%SystemRoot%\System32\api-ms-win-crt*.dll" 2^>nul') do (
-    set /a API_MS_DLL_COUNT+=1
+for /f "tokens=*" %%a in ('dir /b "%SystemRoot%\System32\api-ms-win-crt*.dll" 2^>nul ^| find /c /v ""') do (
+    set API_MS_DLL_COUNT=%%a
 )
 
+:: Вывод количества найденных файлов для диагностики
+echo [*] Найдено файлов api-ms-win-crt*.dll: !API_MS_DLL_COUNT!
+
 if !API_MS_DLL_COUNT! LSS 5 (
-    echo [-] Отсутствуют системные библиотеки api-ms-win-crt*.dll! Найдено: !API_MS_DLL_COUNT!
+    echo [-] Недостаточно системных библиотек api-ms-win-crt*.dll! Найдено: !API_MS_DLL_COUNT!
     goto install_vcredist
 ) else (
-    echo [+] Системные библиотеки api-ms-win-crt*.dll найдены (!API_MS_DLL_COUNT! файлов).
+    echo [+] Системные библиотеки api-ms-win-crt*.dll найдены в достаточном количестве.
 )
 
 :: Проверяем наличие Python
