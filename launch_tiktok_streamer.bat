@@ -1,71 +1,78 @@
 @echo off
+chcp 65001 > nul
 setlocal enabledelayedexpansion
+title TikTok Streamer Launcher
 
+:: Установка цветовых схем
+color 0A
+
+:: Создаем временную папку для скачивания
+if not exist ".\temp" mkdir ".\temp"
+
+echo ===============================================================
+echo           TikTok Streamer - Запуск приложения
+echo ===============================================================
 echo.
-echo ===================================================
-echo =       TikTok Streamer - Программа запуска       =
-echo ===================================================
-echo.
-
-:: Проверяем наличие администраторских прав
-net session >nul 2>&1
-if %errorlevel% neq 0 (
-    echo [!] Запуск программы без прав администратора.
-    echo [!] Некоторые функции могут не работать корректно.
-    echo [!] Рекомендуется перезапустить от имени администратора.
-    echo.
-    choice /C YN /M "Продолжить без прав администратора?"
-    if !errorlevel! equ 2 (
-        exit /b 1
-    )
-)
-
-:: Проверяем наличие Python
-echo [*] Проверка установки Python...
-where python >nul 2>&1
-if %errorlevel% neq 0 (
-    echo [-] Python не найден в системе!
-    goto install_python
-) else (
-    for /f "tokens=* USEBACKQ" %%F in (`python --version`) do set PYTHON_VERSION=%%F
-    echo [+] Найден !PYTHON_VERSION!
-)
-
-:: Проверяем версию Python
-echo [*] Проверка версии Python...
-python -c "import sys; exit(1) if sys.version_info < (3,8) else exit(0)" 2>nul
-if %errorlevel% neq 0 (
-    echo [-] Установленная версия Python устарела!
-    echo [-] Требуется Python 3.8 или выше.
-    goto install_python
-) else (
-    echo [+] Версия Python соответствует требованиям.
-)
 
 :: Проверяем наличие Visual C++ Redistributable
-echo [*] Проверка наличия Visual C++ Redistributable...
+echo [*] Проверка наличия Microsoft Visual C++ Redistributable...
 if not exist "%SystemRoot%\System32\vcruntime140.dll" (
     echo [-] Visual C++ Redistributable не установлен!
     goto install_vcredist
 ) else (
-    echo [+] Visual C++ Redistributable установлен.
+    echo [+] Visual C++ Redistributable найден, проверяем библиотеки api-ms-win-crt...
 )
 
 :: Проверяем наличие файлов api-ms-win-crt*.dll
-echo [*] Проверка наличия системных библиотек api-ms-win-crt*.dll...
-set API_MS_DLL_MISSING=0
+set API_MS_DLL_COUNT=0
 for /f "tokens=*" %%a in ('dir /b "%SystemRoot%\System32\api-ms-win-crt*.dll" 2^>nul') do (
     set /a API_MS_DLL_COUNT+=1
 )
 
 if !API_MS_DLL_COUNT! LSS 5 (
-    echo [-] Отсутствуют системные библиотеки api-ms-win-crt*.dll!
-    set API_MS_DLL_MISSING=1
+    echo [-] Отсутствуют системные библиотеки api-ms-win-crt*.dll! Найдено: !API_MS_DLL_COUNT!
     goto install_vcredist
 ) else (
-    echo [+] Системные библиотеки api-ms-win-crt*.dll найдены.
+    echo [+] Системные библиотеки api-ms-win-crt*.dll найдены (!API_MS_DLL_COUNT! файлов).
 )
 
+:: Проверяем наличие Python
+echo [*] Проверка наличия Python...
+where python >nul 2>&1
+if !ERRORLEVEL! neq 0 (
+    echo [-] Python не найден. Необходимо установить Python.
+    goto install_python
+) else (
+    echo [+] Python установлен, проверяем версию...
+)
+
+:: Проверяем версию Python (нужна 3.8 или выше)
+for /f "tokens=2 delims= " %%I in ('python --version 2^>^&1') do set PY_VERSION=%%I
+if "!PY_VERSION!"=="" (
+    echo [-] Не удалось определить версию Python.
+    goto install_python
+)
+
+for /f "tokens=1,2 delims=." %%I in ("!PY_VERSION!") do (
+    set PY_MAJOR=%%I
+    set PY_MINOR=%%J
+)
+
+echo [*] Версия Python: !PY_MAJOR!.!PY_MINOR!
+
+if !PY_MAJOR! LSS 3 (
+    echo [-] Версия Python слишком старая. Требуется Python 3.8 или выше.
+    goto install_python
+)
+
+if !PY_MAJOR! EQU 3 (
+    if !PY_MINOR! LSS 8 (
+        echo [-] Версия Python слишком старая. Требуется Python 3.8 или выше.
+        goto install_python
+    )
+)
+
+echo [+] Версия Python соответствует требованиям.
 goto check_deps
 
 :install_vcredist
@@ -73,12 +80,9 @@ echo.
 echo [*] Необходима установка Microsoft Visual C++ Redistributable...
 echo [*] Скачиваем установщик...
 
-:: Создаем временную директорию
-if not exist "temp" mkdir temp
-
 :: Скачиваем установщик Visual C++ Redistributable
-powershell -Command "& {Invoke-WebRequest -Uri 'https://aka.ms/vs/17/release/vc_redist.x64.exe' -OutFile 'temp\vc_redist.x64.exe'}"
-if %errorlevel% neq 0 (
+powershell -Command "& {[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri 'https://aka.ms/vs/17/release/vc_redist.x64.exe' -OutFile '.\temp\vc_redist.x64.exe'}"
+if !ERRORLEVEL! neq 0 (
     echo [-] Ошибка при скачивании установщика.
     echo [!] Пожалуйста, скачайте и установите Microsoft Visual C++ Redistributable вручную:
     echo [!] https://aka.ms/vs/17/release/vc_redist.x64.exe
@@ -88,50 +92,87 @@ if %errorlevel% neq 0 (
 )
 
 echo [*] Запуск установки Visual C++ Redistributable...
-temp\vc_redist.x64.exe /install /quiet /norestart
-if %errorlevel% neq 0 (
+start /wait .\temp\vc_redist.x64.exe /install /quiet /norestart
+if !ERRORLEVEL! neq 0 (
     echo [-] Ошибка при установке Visual C++ Redistributable.
     echo [!] Попробуйте установить вручную:
-    echo [!] temp\vc_redist.x64.exe
+    echo [!] .\temp\vc_redist.x64.exe
     pause
     exit /b 1
 )
 
 echo [+] Microsoft Visual C++ Redistributable успешно установлен.
-goto check_deps
+echo [*] Продолжаем проверку других компонентов...
+
+:: После установки VCRedist проверяем наличие Python
+echo [*] Проверка наличия Python...
+where python >nul 2>&1
+if !ERRORLEVEL! neq 0 (
+    echo [-] Python не найден. Необходимо установить Python.
+    goto install_python
+) else (
+    echo [+] Python установлен, проверяем версию...
+    goto check_python_version
+)
 
 :install_python
-echo.
-echo [*] Необходима установка Python 3.10...
-echo [*] Скачиваем установщик Python...
-
-:: Создаем временную директорию
-if not exist "temp" mkdir temp
-
-:: Скачиваем установщик Python 3.10
-powershell -Command "& {Invoke-WebRequest -Uri 'https://www.python.org/ftp/python/3.10.8/python-3.10.8-amd64.exe' -OutFile 'temp\python_installer.exe'}"
-if %errorlevel% neq 0 (
+echo [*] Скачивание и установка Python 3.10...
+:: Скачиваем Python
+powershell -Command "& {[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri 'https://www.python.org/ftp/python/3.10.11/python-3.10.11-amd64.exe' -OutFile '.\temp\python_installer.exe'}"
+if !ERRORLEVEL! neq 0 (
     echo [-] Ошибка при скачивании Python. Проверьте подключение к интернету.
-    echo [!] Пожалуйста, скачайте и установите Python вручную с https://www.python.org/downloads/
+    echo [!] Посетите сайт: https://www.python.org/downloads/
+    echo [!] И установите Python 3.10 или новее вручную.
     pause
     exit /b 1
 )
 
-echo [*] Запуск установки Python 3.10...
-echo [*] ВАЖНО: Отметьте опцию "Add Python to PATH" в установщике!
-start /wait temp\python_installer.exe /quiet InstallAllUsers=1 PrependPath=1 Include_test=0
-if %errorlevel% neq 0 (
-    echo [-] Ошибка при установке Python.
-    echo [!] Попробуйте установить Python 3.10 вручную.
+:: Устанавливаем Python (тихая установка с добавлением в PATH)
+echo [*] Установка Python 3.10...
+.\temp\python_installer.exe /quiet InstallAllUsers=0 PrependPath=1 Include_test=0 Include_doc=0
+if !ERRORLEVEL! neq 0 (
+    echo [-] Ошибка при установке Python. Попробуйте запустить от имени администратора.
     pause
     exit /b 1
 )
+
+:: Обновляем переменную PATH для текущей сессии
+set "PATH=%PATH%;%USERPROFILE%\AppData\Local\Programs\Python\Python310\Scripts;%USERPROFILE%\AppData\Local\Programs\Python\Python310"
 
 echo [+] Python 3.10 успешно установлен.
 echo [!] Пожалуйста, перезапустите этот скрипт для продолжения.
 echo [!] Не забудьте ЗАКРЫТЬ И ОТКРЫТЬ ЗАНОВО командную строку/PowerShell!
 pause
 exit /b 0
+
+:check_python_version
+:: Проверяем версию Python (нужна 3.8 или выше)
+for /f "tokens=2 delims= " %%I in ('python --version 2^>^&1') do set PY_VERSION=%%I
+if "!PY_VERSION!"=="" (
+    echo [-] Не удалось определить версию Python.
+    goto install_python
+)
+
+for /f "tokens=1,2 delims=." %%I in ("!PY_VERSION!") do (
+    set PY_MAJOR=%%I
+    set PY_MINOR=%%J
+)
+
+echo [*] Версия Python: !PY_MAJOR!.!PY_MINOR!
+
+if !PY_MAJOR! LSS 3 (
+    echo [-] Версия Python слишком старая. Требуется Python 3.8 или выше.
+    goto install_python
+)
+
+if !PY_MAJOR! EQU 3 (
+    if !PY_MINOR! LSS 8 (
+        echo [-] Версия Python слишком старая. Требуется Python 3.8 или выше.
+        goto install_python
+    )
+)
+
+echo [+] Версия Python соответствует требованиям.
 
 :check_deps
 echo.
@@ -153,7 +194,6 @@ if not exist "requirements.txt" (
         echo TikTokLive==6.4.4
         echo aiohttp>=3.8.0
         echo requests>=2.28.0
-        echo python-logging-loki>=0.3.1
     ) > requirements.txt
     
     echo [+] Файл requirements.txt создан.
@@ -210,9 +250,8 @@ python app.py
 if !ERRORLEVEL! neq 0 (
     echo.
     echo [-] Произошла ошибка при запуске приложения.
-    echo [!] Детали ошибки можно найти в логах.
-    pause
-    exit /b 1
+    echo [!] Проверьте файл error.log, если он существует.
 )
 
+pause
 exit /b 0
