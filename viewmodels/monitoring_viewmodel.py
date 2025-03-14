@@ -2,7 +2,8 @@ import asyncio
 import threading
 from datetime import datetime
 from TikTokLive import TikTokLiveClient
-from TikTokLive.types.events import GiftEvent, LikeEvent, JoinEvent, ConnectEvent, DisconnectEvent
+# Обновленная строка импорта событий
+from TikTokLive.events import GiftEvent, LikeEvent, JoinEvent, ConnectEvent, DisconnectEvent
 
 from models.data_models import TableItemView, AlertLevel
 from utils.settings import Settings
