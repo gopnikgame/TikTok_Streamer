@@ -233,29 +233,59 @@ class MonitoringViewModel(Observable):
                 self.logger.info(f"Получен подарок {event.gift.name} от {event.user.nickname}")
                 
                 try:
-                    # Создаем запись о событии
-                    item = TableItemView(
-                        timestamp=datetime.now(),
-                        name=event.user.nickname,
-                        event=f"донат {event.gift.name}",
-                        alert_level=AlertLevel.IMPORTANT
-                    )
+                    # Для подарков с поддержкой стриков
+                    if event.gift.streakable:
+                        # Обрабатываем только когда стрик закончился (не во время стрика)
+                        if not event.streaking:
+                            # Создаем запись о событии
+                            item = TableItemView(
+                                timestamp=datetime.now(),
+                                name=event.user.nickname,
+                                event=f"донат {event.gift.name} x{event.repeat_count}",
+                                alert_level=AlertLevel.IMPORTANT
+                            )
+                            
+                            # Добавляем в список для UI
+                            self.add_item(item)
+                            
+                            # Озвучиваем и проигрываем звук, если включено
+                            if self.speech_gift:
+                                self.logger.debug(f"Озвучивание подарка от {event.user.nickname}")
+                                self.speech_service.speech(
+                                    f"{event.user.nickname} прислал {event.gift.name} {event.repeat_count} раз",
+                                    self.settings.speech_voice,
+                                    self.settings.speech_rate
+                                )
+                            
+                            if self.notify_gift:
+                                self.logger.debug(f"Воспроизведение звука для подарка ID {event.gift.id}")
+                                self.sound_service.play(event.gift.id, self.settings.notify_delay)
                     
-                    # Добавляем в список для UI
-                    self.add_item(item)
-                    
-                    # Озвучиваем и проигрываем звук, если включено
-                    if self.speech_gift:
-                        self.logger.debug(f"Озвучивание подарка от {event.user.nickname}")
-                        self.speech_service.speech(
-                            f"{event.user.nickname} прислал {event.gift.name}",
-                            self.settings.speech_voice,
-                            self.settings.speech_rate
+                    # Для подарков без поддержки стриков
+                    else:
+                        # Создаем запись о событии
+                        item = TableItemView(
+                            timestamp=datetime.now(),
+                            name=event.user.nickname,
+                            event=f"донат {event.gift.name}",
+                            alert_level=AlertLevel.IMPORTANT
                         )
-                    
-                    if self.notify_gift:
-                        self.logger.debug(f"Воспроизведение звука для подарка ID {event.gift.id}")
-                        self.sound_service.play(event.gift.id, self.settings.notify_delay)
+                        
+                        # Добавляем в список для UI
+                        self.add_item(item)
+                        
+                        # Озвучиваем и проигрываем звук, если включено
+                        if self.speech_gift:
+                            self.logger.debug(f"Озвучивание подарка от {event.user.nickname}")
+                            self.speech_service.speech(
+                                f"{event.user.nickname} прислал {event.gift.name}",
+                                self.settings.speech_voice,
+                                self.settings.speech_rate
+                            )
+                        
+                        if self.notify_gift:
+                            self.logger.debug(f"Воспроизведение звука для подарка ID {event.gift.id}")
+                            self.sound_service.play(event.gift.id, self.settings.notify_delay)
                 except Exception as e:
                     self.logger.error(f"Ошибка при обработке подарка: {str(e)}", exc_info=True)
             
