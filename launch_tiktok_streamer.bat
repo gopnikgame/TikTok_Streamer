@@ -84,48 +84,62 @@ goto check_python
 :install_vcredist
 echo.
 echo [*] Необходима установка Microsoft Visual C++ Redistributable...
-echo [*] Скачиваем установщик...
 
-:: Удаляем старый файл, если он существует
-if exist ".\temp\vc_redist.x64.exe" (
-    del /f /q ".\temp\vc_redist.x64.exe"
-)
+:: Устанавливаем все необходимые версии Visual C++ Redistributable
+echo [*] Установка различных версий Visual C++ Redistributable...
 
-:: Скачиваем последний Visual C++ Redistributable
-powershell -Command "& {[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri 'https://aka.ms/vs/17/release/vc_redist.x64.exe' -OutFile '.\temp\vc_redist.x64.exe'}"
+:: Современная версия 2015-2022 (x64)
+echo [*] Скачиваем Visual C++ Redistributable 2015-2022 (x64)...
+powershell -Command "& {[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri 'https://aka.ms/vs/17/release/vc_redist.x64.exe' -OutFile '.\temp\vc_redist_2022_x64.exe'}"
 if !ERRORLEVEL! neq 0 (
-    echo [-] Ошибка при скачивании Visual C++ Redistributable.
-    echo [!] Пожалуйста, скачайте и установите вручную:
-    echo [!] https://aka.ms/vs/17/release/vc_redist.x64.exe
-    pause
-    exit /b 1
+    echo [-] Ошибка при скачивании Visual C++ Redistributable 2015-2022 (x64).
+) else (
+    echo [*] Устанавливаем Visual C++ Redistributable 2015-2022 (x64)...
+    start /wait "VC Redist 2022 x64" ".\temp\vc_redist_2022_x64.exe" /install /quiet /norestart
 )
 
-echo [*] Запуск установки Visual C++ Redistributable...
-echo [*] Это может занять некоторое время, пожалуйста, подождите...
-
-:: Запускаем установщик с ожиданием завершения
-start /wait "Visual C++ Installer" ".\temp\vc_redist.x64.exe" /install /quiet /norestart
+:: Современная версия 2015-2022 (x86) - иногда нужна даже на 64-битных системах
+echo [*] Скачиваем Visual C++ Redistributable 2015-2022 (x86)...
+powershell -Command "& {[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri 'https://aka.ms/vs/17/release/vc_redist.x86.exe' -OutFile '.\temp\vc_redist_2022_x86.exe'}"
 if !ERRORLEVEL! neq 0 (
-    echo [-] Ошибка при установке Visual C++ Redistributable.
-    echo [!] Пробуем запустить установку в обычном режиме...
-    start "" ".\temp\vc_redist.x64.exe"
-    echo [!] После завершения установки перезапустите скрипт.
-    pause
-    exit /b 1
+    echo [-] Ошибка при скачивании Visual C++ Redistributable 2015-2022 (x86).
+) else (
+    echo [*] Устанавливаем Visual C++ Redistributable 2015-2022 (x86)...
+    start /wait "VC Redist 2022 x86" ".\temp\vc_redist_2022_x86.exe" /install /quiet /norestart
 )
 
-echo [+] Microsoft Visual C++ Redistributable успешно установлен.
+:: VS2015 версия (x64), которая часто требуется именно для UCRT
+echo [*] Скачиваем Visual C++ Redistributable 2015 Update 3 (x64)...
+powershell -Command "& {[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri 'https://download.microsoft.com/download/6/A/A/6AA4EDFF-645B-48C5-81CC-ED5963AEAD48/vc_redist.x64.exe' -OutFile '.\temp\vc_redist_2015_x64.exe'}"
+if !ERRORLEVEL! neq 0 (
+    echo [-] Ошибка при скачивании Visual C++ Redistributable 2015 Update 3 (x64).
+) else (
+    echo [*] Устанавливаем Visual C++ Redistributable 2015 Update 3 (x64)...
+    start /wait "VC Redist 2015 x64" ".\temp\vc_redist_2015_x64.exe" /install /quiet /norestart
+)
+
+:: VS2015 версия (x86)
+echo [*] Скачиваем Visual C++ Redistributable 2015 Update 3 (x86)...
+powershell -Command "& {[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri 'https://download.microsoft.com/download/6/A/A/6AA4EDFF-645B-48C5-81CC-ED5963AEAD48/vc_redist.x86.exe' -OutFile '.\temp\vc_redist_2015_x86.exe'}"
+if !ERRORLEVEL! neq 0 (
+    echo [-] Ошибка при скачивании Visual C++ Redistributable 2015 Update 3 (x86).
+) else (
+    echo [*] Устанавливаем Visual C++ Redistributable 2015 Update 3 (x86)...
+    start /wait "VC Redist 2015 x86" ".\temp\vc_redist_2015_x86.exe" /install /quiet /norestart
+)
+
+echo [+] Установка Microsoft Visual C++ Redistributable завершена.
 
 :: Проверяем, решило ли это проблему с UCRT
 set CRT_FIXED=0
 if exist "%SystemRoot%\System32\api-ms-win-crt-runtime-l1-1-0.dll" if exist "%SystemRoot%\System32\api-ms-win-crt-stdio-l1-1-0.dll" if exist "%SystemRoot%\System32\api-ms-win-crt-math-l1-1-0.dll" set CRT_FIXED=1
 
 if !CRT_FIXED! EQU 1 (
-    echo [+] Установка Visual C++ Redistributable также установила необходимые компоненты UCRT
+    echo [+] Установка Visual C++ Redistributable успешно решила проблему с отсутствующими DLL!
+    echo [+] Все необходимые компоненты UCRT установлены.
     goto check_python
 ) else (
-    echo [-] После установки Visual C++ Redistributable все еще отсутствуют компоненты UCRT
+    echo [-] После установки Visual C++ Redistributable всё еще отсутствуют компоненты UCRT
     if !NEED_UCRT! EQU 1 goto install_ucrt
     goto check_python
 )
