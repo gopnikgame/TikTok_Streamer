@@ -259,7 +259,7 @@ if [ $? -ne 0 ]; then
     pip install PyQt6>=6.5.0
     pip install pyttsx3>=2.90
     pip install pygame>=2.5.0
-    pip install TikTokLive>=5.0.0
+    pip install TikTokLive>=6.4.4
     pip install aiohttp>=3.8.0
     pip install requests>=2.28.0
 fi
