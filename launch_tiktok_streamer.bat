@@ -14,6 +14,20 @@ echo           TikTok Streamer - Запуск приложения
 echo ===============================================================
 echo.
 
+:: Проверяем права администратора
+echo [*] Проверка прав администратора...
+net session >nul 2>&1
+if !ERRORLEVEL! neq 0 (
+    echo [!] Внимание: Скрипт запущен без прав администратора
+    echo [!] Для установки Visual C++ Redistributable рекомендуется запустить от имени администратора
+    echo [!] Некоторые функции могут работать некорректно
+    echo.
+    choice /C YN /M "Продолжить без прав администратора?"
+    if !ERRORLEVEL! equ 2 (
+        exit /b 1
+    )
+)
+
 :: Проверяем наличие Visual C++ Redistributable
 echo [*] Проверка наличия Microsoft Visual C++ Redistributable...
 if not exist "%SystemRoot%\System32\vcruntime140.dll" (
@@ -26,7 +40,7 @@ if not exist "%SystemRoot%\System32\vcruntime140.dll" (
 :: Проверяем наличие файлов api-ms-win-crt*.dll
 :: Правильно инициализируем переменную перед использованием
 set API_MS_DLL_COUNT=0
-for /f "tokens=*" %%a in ('dir /b "%SystemRoot%\System32\api-ms-win-crt*.dll" 2^>nul ^| find /c /v ""') do (
+for /f %%a in ('dir /b "%SystemRoot%\System32\api-ms-win-crt*.dll" 2^>^&1 ^| find /c /v ""') do (
     set API_MS_DLL_COUNT=%%a
 )
 
@@ -34,7 +48,7 @@ for /f "tokens=*" %%a in ('dir /b "%SystemRoot%\System32\api-ms-win-crt*.dll" 2^
 echo [*] Найдено файлов api-ms-win-crt*.dll: !API_MS_DLL_COUNT!
 
 if !API_MS_DLL_COUNT! LSS 5 (
-    echo [-] Недостаточно системных библиотек api-ms-win-crt*.dll! Найдено: !API_MS_DLL_COUNT!
+    echo [-] Недостаточно системных библиотек api-ms-win-crt*.dll: !API_MS_DLL_COUNT!
     goto install_vcredist
 ) else (
     echo [+] Системные библиотеки api-ms-win-crt*.dll найдены в достаточном количестве.
@@ -84,23 +98,49 @@ echo.
 echo [*] Необходима установка Microsoft Visual C++ Redistributable...
 echo [*] Скачиваем установщик...
 
-:: Скачиваем установщик Visual C++ Redistributable
+:: Удаляем старый файл, если он существует
+if exist ".\temp\vc_redist.x64.exe" (
+    del /f /q ".\temp\vc_redist.x64.exe"
+)
+
+:: Скачиваем установщик Visual C++ Redistributable через PowerShell
 powershell -Command "& {[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri 'https://aka.ms/vs/17/release/vc_redist.x64.exe' -OutFile '.\temp\vc_redist.x64.exe'}"
 if !ERRORLEVEL! neq 0 (
-    echo [-] Ошибка при скачивании установщика.
-    echo [!] Пожалуйста, скачайте и установите Microsoft Visual C++ Redistributable вручную:
+    echo [-] Ошибка при скачивании установщика Visual C++ Redistributable.
+    echo [!] Пожалуйста, скачайте и установите Visual C++ Redistributable вручную:
     echo [!] https://aka.ms/vs/17/release/vc_redist.x64.exe
+    echo.
+    echo [!] Вы также можете попробовать скачать напрямую с сервера Microsoft:
+    echo [!] https://download.visualstudio.microsoft.com/download/pr/9e94e996-9961-4443-9dce-0f8d862222bd/64AFC5FC94DEF5C830F7333D522A6F631D2C621A6F4E7886272D9D8DE37E6471/VC_redist.x64.exe
+    echo.
     echo [!] После установки перезапустите этот скрипт.
     pause
     exit /b 1
 )
 
+:: Проверяем, что файл действительно скачался
+if not exist ".\temp\vc_redist.x64.exe" (
+    echo [-] Файл установщика не был скачан корректно.
+    echo [!] Пожалуйста, скачайте и установите Visual C++ Redistributable вручную.
+    pause
+    exit /b 1
+)
+
 echo [*] Запуск установки Visual C++ Redistributable...
-start /wait .\temp\vc_redist.x64.exe /install /quiet /norestart
+echo [*] Это может занять некоторое время, пожалуйста, подождите...
+echo [*] Размер файла установщика: 
+for %%A in (".\temp\vc_redist.x64.exe") do (
+    echo [*] %%~zA байт
+)
+
+:: Запускаем установщик с ожиданием завершения
+start /wait "Visual C++ Installer" ".\temp\vc_redist.x64.exe" /install /quiet /norestart
 if !ERRORLEVEL! neq 0 (
-    echo [-] Ошибка при установке Visual C++ Redistributable.
-    echo [!] Попробуйте установить вручную:
-    echo [!] .\temp\vc_redist.x64.exe
+    echo [-] Ошибка при установке Visual C++ Redistributable (код: !ERRORLEVEL!).
+    echo [!] Пробуем запустить установку в обычном режиме...
+    echo [!] Следуйте инструкциям в установщике и нажимайте "Далее"...
+    start "" ".\temp\vc_redist.x64.exe"
+    echo [!] После завершения установки перезапустите этот скрипт.
     pause
     exit /b 1
 )
@@ -109,24 +149,19 @@ echo [+] Microsoft Visual C++ Redistributable успешно установле�
 echo [*] Продолжаем проверку других компонентов...
 
 :: После установки VCRedist проверяем наличие Python
-echo [*] Проверка наличия Python...
-where python >nul 2>&1
-if !ERRORLEVEL! neq 0 (
-    echo [-] Python не найден. Необходимо установить Python.
-    goto install_python
-) else (
-    echo [+] Python установлен, проверяем версию...
-    goto check_python_version
-)
+goto check_python
 
 :install_python
 echo [*] Скачивание и установка Python 3.10...
 :: Скачиваем Python
+if exist ".\temp\python_installer.exe" (
+    del /f /q ".\temp\python_installer.exe"
+)
+
 powershell -Command "& {[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri 'https://www.python.org/ftp/python/3.10.11/python-3.10.11-amd64.exe' -OutFile '.\temp\python_installer.exe'}"
 if !ERRORLEVEL! neq 0 (
     echo [-] Ошибка при скачивании Python. Проверьте подключение к интернету.
-    echo [!] Посетите сайт: https://www.python.org/downloads/
-    echo [!] И установите Python 3.10 или новее вручную.
+    echo [!] Пожалуйста, скачайте и установите Python вручную с https://www.python.org/downloads/
     pause
     exit /b 1
 )
@@ -135,7 +170,11 @@ if !ERRORLEVEL! neq 0 (
 echo [*] Установка Python 3.10...
 .\temp\python_installer.exe /quiet InstallAllUsers=0 PrependPath=1 Include_test=0 Include_doc=0
 if !ERRORLEVEL! neq 0 (
-    echo [-] Ошибка при установке Python. Попробуйте запустить от имени администратора.
+    echo [-] Ошибка при тихой установке Python.
+    echo [*] Запускаем установщик в графическом режиме...
+    echo [!] ВАЖНО: Отметьте опцию "Add Python to PATH" в установщике!
+    start "" ".\temp\python_installer.exe"
+    echo [!] После завершения установки перезапустите этот скрипт.
     pause
     exit /b 1
 )
@@ -149,7 +188,16 @@ echo [!] Не забудьте ЗАКРЫТЬ И ОТКРЫТЬ ЗАНОВО к�
 pause
 exit /b 0
 
-:check_python_version
+:check_python
+echo [*] Проверка наличия Python...
+where python >nul 2>&1
+if !ERRORLEVEL! neq 0 (
+    echo [-] Python не найден. Необходимо установить Python.
+    goto install_python
+) else (
+    echo [+] Python установлен, проверяем версию...
+)
+
 :: Проверяем версию Python (нужна 3.8 или выше)
 for /f "tokens=2 delims= " %%I in ('python --version 2^>^&1') do set PY_VERSION=%%I
 if "!PY_VERSION!"=="" (
