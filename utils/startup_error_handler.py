@@ -23,19 +23,22 @@ class StartupErrorHandler:
     REQUIRED_DLLS_WINDOWS = [
         "vcruntime140.dll",       # Visual C++ Runtime
         "msvcp140.dll",           # Visual C++ Runtime
-        "api-ms-win-crt-*.dll"    # Universal C Runtime
+        "api-ms-win-crt-runtime-l1-1-0.dll",  # Universal C Runtime
+        "api-ms-win-crt-stdio-l1-1-0.dll",    # Universal C Runtime
+        "api-ms-win-crt-math-l1-1-0.dll"      # Universal C Runtime
     ]
     
     # Сообщения о решениях распространенных проблем
     ERROR_SOLUTIONS = {
-        "PyQt6": "Установите PyQt6: pip install PyQt6",
-        "pyttsx3": "Установите pyttsx3: pip install pyttsx3",
-        "pygame": "Установите pygame: pip install pygame",
-        "TikTokLive": "Установите TikTokLive: pip install TikTokLive",
-        "aiohttp": "Установите aiohttp: pip install aiohttp",
-        "requests": "Установите requests: pip install requests",
-        "DLL_ERROR": "Установите последнюю версию Microsoft Visual C++ Redistributable с сайта Microsoft",
-        "VCRUNTIME_ERROR": "Установите Visual C++ Redistributable: https://aka.ms/vs/16/release/vc_redist.x64.exe"
+        "PyQt6": "Установите PyQt6: pip install PyQt6>=6.5.0",
+        "pyttsx3": "Установите pyttsx3: pip install pyttsx3>=2.90",
+        "pygame": "Установите pygame: pip install pygame>=2.5.0",
+        "TikTokLive": "Установите TikTokLive: pip install TikTokLive==6.4.4",
+        "aiohttp": "Установите aiohttp: pip install aiohttp>=3.8.0",
+        "requests": "Установите requests: pip install requests>=2.28.0",
+        "DLL_ERROR": "Запустите скрипт launch_tiktok_streamer.bat, который автоматически установит Microsoft Visual C++ Redistributable",
+        "VCRUNTIME_ERROR": "Запустите скрипт launch_tiktok_streamer.bat, который автоматически установит Microsoft Visual C++ Redistributable",
+        "API_MS_WIN_CRT_ERROR": "Запустите скрипт launch_tiktok_streamer.bat, который автоматически установит Microsoft Visual C++ Redistributable"
     }
     
     @staticmethod
@@ -81,10 +84,11 @@ class StartupErrorHandler:
                 # Проверка конкретного DLL
                 found = False
                 for path in system_paths:
-                    dll_path = os.path.join(path, dll)
-                    if os.path.exists(dll_path):
-                        found = True
-                        break
+                    if os.path.exists(path):
+                        dll_path = os.path.join(path, dll)
+                        if os.path.exists(dll_path):
+                            found = True
+                            break
                 if not found:
                     missing_dlls.append(dll)
         
@@ -170,6 +174,8 @@ class StartupErrorHandler:
             error_message += f"Решение: {StartupErrorHandler.get_solution_for_error(module_name)}\n\n"
         elif "DLL" in str(e) or "dll" in str(e):
             error_message += f"Решение: {StartupErrorHandler.get_solution_for_error('DLL_ERROR')}\n\n"
+        elif "api-ms-win-crt" in str(e).lower():
+            error_message += f"Решение: {StartupErrorHandler.get_solution_for_error('API_MS_WIN_CRT_ERROR')}\n\n"
         
         # Добавляем полный стек-трейс для отладки
         error_message += "Технические детали ошибки (для разработчиков):\n"
