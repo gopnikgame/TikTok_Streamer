@@ -143,7 +143,6 @@ class MonitoringViewModel(Observable):
             if len(self.item_list) > 1000:
                 self.item_list.pop()
             self.logger.debug(f"Добавлено событие: {item.timestamp} - {item.name} - {item.event}")
-            
             # Безопасное уведомление об изменении свойства
             try:
                 self.notify_property_changed('item_list')
@@ -166,7 +165,6 @@ class MonitoringViewModel(Observable):
         self.is_processing = True
         self.item_list.clear()
         self.notify_property_changed('item_list')
-        
         # Создаем функцию-обёртку для запуска асинхронного кода
         def run_async_tiktok():
             loop = asyncio.new_event_loop()
@@ -175,7 +173,6 @@ class MonitoringViewModel(Observable):
                 loop.run_until_complete(self._run_tiktok_client())
             finally:
                 loop.close()
-        
         # Запускаем в отдельном потоке
         threading.Thread(target=run_async_tiktok, daemon=True).start()
 
@@ -185,11 +182,15 @@ class MonitoringViewModel(Observable):
             try:
                 self.logger.info("Остановка мониторинга стрима")
                 # Используем disconnect вместо stop, так как stop отсутствует
+                if self.client_task:
+                    self.client_task.cancel()
+                    self.logger.debug("Задача клиента отменена")
                 asyncio.run_coroutine_threadsafe(self.client.disconnect(), self.loop)
             except Exception as e:
                 self.logger.error(f"Ошибка при остановке клиента: {str(e)}")
                 self.error_handler.handle_tiktok_error(None, e)
         self.is_monitoring = False
+        self.is_processing = False
         self.logger.info("Мониторинг остановлен")
 
     async def _run_tiktok_client(self):
@@ -204,7 +205,6 @@ class MonitoringViewModel(Observable):
             self.logger.debug(f"Инициализация TikTokLiveClient для {self.stream}")
             self.client = TikTokLiveClient(self.stream)
             self.logger.debug(f"TikTokLiveClient создан: {self.client}")
-
             # Обработчик подключения
             @self.client.on(ConnectEvent)
             async def on_connect(event: ConnectEvent):
@@ -220,7 +220,6 @@ class MonitoringViewModel(Observable):
                 )
                 self.add_item(item)
                 self.logger.debug("on_connect обработчик завершен")
-
             # Обработчик отключения
             @self.client.on(DisconnectEvent)
             async def on_disconnect(event: DisconnectEvent):
@@ -236,7 +235,6 @@ class MonitoringViewModel(Observable):
                 )
                 self.add_item(item)
                 self.logger.debug("on_disconnect обработчик завершен")
-
             # Обработчики подарков, лайков и подключений
             @self.client.on(GiftEvent)
             async def on_gift(event: GiftEvent):
@@ -281,7 +279,6 @@ class MonitoringViewModel(Observable):
                             self.sound_service.play(event.gift.id, self.settings.notify_delay)
                 except Exception as e:
                     self.logger.error(f"Ошибка при обработке подарка: {str(e)}", exc_info=True)
-
             @self.client.on(LikeEvent)
             async def on_like(event: LikeEvent):
                 self.logger.debug(f"Получен лайк от {event.user.nickname}")
@@ -303,7 +300,6 @@ class MonitoringViewModel(Observable):
                         )
                 except Exception as e:
                     self.logger.error(f"Ошибка при обработке лайка: {str(e)}", exc_info=True)
-
             @self.client.on(JoinEvent)
             async def on_join(event: JoinEvent):
                 self.logger.debug(f"Новое подключение: {event.user.nickname}")
@@ -325,14 +321,15 @@ class MonitoringViewModel(Observable):
                         )
                 except Exception as e:
                     self.logger.error(f"Ошибка при обработке подключения: {str(e)}", exc_info=True)
-
             # Запускаем клиент и ждем завершения
             self.logger.info("Запуск клиента TikTok Live")
             self.client_task = self.loop.create_task(self.client.start())
             self.logger.debug(f"Задача клиента создана: {self.client_task}")
-            while True:
+            # Используем условный цикл вместо бесконечного цикла
+            while not self.client_task.done() and not self.client_task.cancelled():
                 self.logger.debug(f"Состояние клиента: {self.client.connected}")
                 await asyncio.sleep(5)  # Проверяем состояние каждые 5 секунд
+            self.logger.debug("Цикл ожидания завершен")
         except Exception as e:
             self.logger.error(f"Ошибка при подключении к TikTok: {str(e)}", exc_info=True)
             item = TableItemView(
