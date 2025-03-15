@@ -1,28 +1,15 @@
-import asyncio
 import threading
-from datetime import datetime
-from TikTokLive import TikTokLiveClient
-from TikTokLive.events import GiftEvent, LikeEvent, JoinEvent, ConnectEvent, DisconnectEvent
+from PyQt6.QtCore import QObject, pyqtSignal, QThread
 from models.data_models import TableItemView, AlertLevel
 from utils.settings import Settings
 from utils.logger import Logger
 from utils.error_handler import ErrorHandler
+from monitoring_worker import MonitoringWorker
 
-class Observable:
-    def __init__(self):
-        self._callbacks = {}
+class MonitoringViewModel(QObject):
+    status_changed = pyqtSignal(str)
+    item_added = pyqtSignal(TableItemView)
 
-    def add_callback(self, property_name, callback):
-        if property_name not in self._callbacks:
-            self._callbacks[property_name] = []
-        self._callbacks[property_name].append(callback)
-
-    def notify_property_changed(self, property_name):
-        if property_name in self._callbacks:
-            for callback in self._callbacks[property_name]:
-                callback()
-
-class MonitoringViewModel(Observable):
     def __init__(self, speech_service, sound_service, gift_service):
         super().__init__()
         self.logger = Logger().get_logger('MonitoringViewModel')
@@ -43,9 +30,8 @@ class MonitoringViewModel(Observable):
         # Список событий для отображения
         self.item_list = []
         # Клиент TikTok
-        self.client = None
-        self.client_task = None
-        self.loop = None
+        self.worker = None
+        self.thread = None
         self.logger.debug("ViewModel мониторинга инициализирован")
 
     # Свойства с уведомлением об изменении
@@ -58,7 +44,7 @@ class MonitoringViewModel(Observable):
         if self._is_monitoring != value:
             self._is_monitoring = value
             self.logger.debug(f"Состояние мониторинга изменено: {value}")
-            self.notify_property_changed('is_monitoring')
+            self.status_changed.emit(f"Состояние мониторинга: {value}")
 
     @property
     def is_processing(self):
@@ -69,7 +55,6 @@ class MonitoringViewModel(Observable):
         if self._is_processing != value:
             self._is_processing = value
             self.logger.debug(f"Состояние обработки изменено: {value}")
-            self.notify_property_changed('is_processing')
 
     @property
     def stream(self):
@@ -82,7 +67,6 @@ class MonitoringViewModel(Observable):
             self.settings.user_id = value
             self.settings.save()
             self.logger.debug(f"ID стрима изменен: {value}")
-            self.notify_property_changed('stream')
 
     @property
     def notify_gift(self):
@@ -95,7 +79,6 @@ class MonitoringViewModel(Observable):
             self.settings.notify_gift = value
             self.settings.save()
             self.logger.debug(f"Настройка звуковых оповещений изменена: {value}")
-            self.notify_property_changed('notify_gift')
 
     @property
     def speech_gift(self):
@@ -108,7 +91,6 @@ class MonitoringViewModel(Observable):
             self.settings.speech_gift = value
             self.settings.save()
             self.logger.debug(f"Настройка озвучивания подарков изменена: {value}")
-            self.notify_property_changed('speech_gift')
 
     @property
     def speech_like(self):
@@ -121,7 +103,6 @@ class MonitoringViewModel(Observable):
             self.settings.speech_like = value
             self.settings.save()
             self.logger.debug(f"Настройка озвучивания лайков изменена: {value}")
-            self.notify_property_changed('speech_like')
 
     @property
     def speech_member(self):
@@ -134,7 +115,6 @@ class MonitoringViewModel(Observable):
             self.settings.speech_member = value
             self.settings.save()
             self.logger.debug(f"Настройка озвучивания подключений изменена: {value}")
-            self.notify_property_changed('speech_member')
 
     def add_item(self, item):
         """Добавляет новое событие в список"""
@@ -143,11 +123,7 @@ class MonitoringViewModel(Observable):
             if len(self.item_list) > 1000:
                 self.item_list.pop()
             self.logger.debug(f"Добавлено событие: {item.timestamp} - {item.name} - {item.event}")
-            # Безопасное уведомление об изменении свойства
-            try:
-                self.notify_property_changed('item_list')
-            except Exception as notify_error:
-                self.logger.error(f"Ошибка при уведомлении об изменении списка: {str(notify_error)}")
+            self.item_added.emit(item)
         except Exception as e:
             self.logger.error(f"Ошибка при добавлении события в список: {str(e)}")
 
@@ -164,28 +140,25 @@ class MonitoringViewModel(Observable):
         self.logger.info(f"Запуск мониторинга стрима: {self.stream}")
         self.is_processing = True
         self.item_list.clear()
-        self.notify_property_changed('item_list')
-        # Создаем функцию-обёртку для запуска асинхронного кода
-        def run_async_tiktok():
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                loop.run_until_complete(self._run_tiktok_client())
-            finally:
-                loop.close()
-        # Запускаем в отдельном потоке
-        threading.Thread(target=run_async_tiktok, daemon=True).start()
+        self.status_changed.emit("Подключение...")
+        self.worker = MonitoringWorker(self.stream, self.settings, self.speech_service, self.sound_service, self.gift_service)
+        self.worker.status_changed.connect(self.on_status_changed)
+        self.worker.item_added.connect(self.on_item_added)
+        self.thread = QThread()
+        self.worker.moveToThread(self.thread)
+        self.thread.started.connect(self.worker.run)
+        self.thread.finished.connect(self.on_thread_finished)
+        self.thread.start()
 
     def stop_monitoring(self):
         """Останавливает мониторинг стрима"""
-        if self.client and self.client.connected:
+        if self.worker and self.thread.isRunning():
             try:
                 self.logger.info("Остановка мониторинга стрима")
-                # Используем disconnect вместо stop, так как stop отсутствует
-                if self.client_task:
-                    self.client_task.cancel()
+                if self.worker.client_task:
+                    self.worker.client_task.cancel()
                     self.logger.debug("Задача клиента отменена")
-                asyncio.run_coroutine_threadsafe(self.client.disconnect(), self.loop)
+                asyncio.run_coroutine_threadsafe(self.worker.client.disconnect(), self.worker.loop)
             except Exception as e:
                 self.logger.error(f"Ошибка при остановке клиента: {str(e)}")
                 self.error_handler.handle_tiktok_error(None, e)
@@ -193,170 +166,14 @@ class MonitoringViewModel(Observable):
         self.is_processing = False
         self.logger.info("Мониторинг остановлен")
 
-    async def _run_tiktok_client(self):
-        """Запускает клиент TikTok Live в отдельном потоке"""
-        self.logger.debug("Запуск метода _run_tiktok_client")
-        try:
-            self.logger.debug("Создание нового event loop для TikTok клиента")
-            # Создаем новый event loop для асинхронного кода
-            self.loop = asyncio.get_event_loop()
-            self.logger.debug(f"Получен event loop: {self.loop}")
-            # Создаем клиент и регистрируем обработчики событий
-            self.logger.debug(f"Инициализация TikTokLiveClient для {self.stream}")
-            self.client = TikTokLiveClient(self.stream)
-            self.logger.debug(f"TikTokLiveClient создан: {self.client}")
-            # Обработчик подключения
-            @self.client.on(ConnectEvent)
-            async def on_connect(event: ConnectEvent):
-                self.logger.info(f"Подключено к стриму {self.stream}")
-                self.is_monitoring = True
-                self.is_processing = False
-                # Добавляем событие о подключении
-                item = TableItemView(
-                    timestamp=datetime.now(),
-                    name="Система",
-                    event=f"Подключено к стриму {self.stream}",
-                    alert_level=AlertLevel.NORMAL
-                )
-                self.add_item(item)
-                self.logger.debug("on_connect обработчик завершен")
-            # Обработчик отключения
-            @self.client.on(DisconnectEvent)
-            async def on_disconnect(event: DisconnectEvent):
-                self.logger.info(f"Отключено от стрима {self.stream}")
-                self.is_monitoring = False
-                self.is_processing = False
-                # Добавляем событие об отключении
-                item = TableItemView(
-                    timestamp=datetime.now(),
-                    name="Система",
-                    event=f"Отключено от стрима {self.stream}",
-                    alert_level=AlertLevel.NORMAL
-                )
-                self.add_item(item)
-                self.logger.debug("on_disconnect обработчик завершен")
-            # Обработчики подарков, лайков и подключений
-            @self.client.on(GiftEvent)
-            async def on_gift(event: GiftEvent):
-                self.logger.info(f"Получен подарок {event.gift.name} от {event.user.nickname}")
-                try:
-                    if event.gift.streakable:
-                        if not event.streaking:
-                            item = TableItemView(
-                                timestamp=datetime.now(),
-                                name=event.user.nickname,
-                                event=f"донат {event.gift.name} x{event.repeat_count}",
-                                alert_level=AlertLevel.IMPORTANT
-                            )
-                            self.add_item(item)
-                            if self.speech_gift:
-                                self.logger.debug(f"Озвучивание подарка от {event.user.nickname}")
-                                self.speech_service.speech(
-                                    f"{event.user.nickname} прислал {event.gift.name} {event.repeat_count} раз",
-                                    self.settings.speech_voice,
-                                    self.settings.speech_rate
-                                )
-                            if self.notify_gift:
-                                self.logger.debug(f"Воспроизведение звука для подарка ID {event.gift.id}")
-                                self.sound_service.play(event.gift.id, self.settings.notify_delay)
-                    else:
-                        item = TableItemView(
-                            timestamp=datetime.now(),
-                            name=event.user.nickname,
-                            event=f"донат {event.gift.name}",
-                            alert_level=AlertLevel.IMPORTANT
-                        )
-                        self.add_item(item)
-                        if self.speech_gift:
-                            self.logger.debug(f"Озвучивание подарка от {event.user.nickname}")
-                            self.speech_service.speech(
-                                f"{event.user.nickname} прислал {event.gift.name}",
-                                self.settings.speech_voice,
-                                self.settings.speech_rate
-                            )
-                        if self.notify_gift:
-                            self.logger.debug(f"Воспроизведение звука для подарка ID {event.gift.id}")
-                            self.sound_service.play(event.gift.id, self.settings.notify_delay)
-                except Exception as e:
-                    self.logger.error(f"Ошибка при обработке подарка: {str(e)}", exc_info=True)
-            @self.client.on(LikeEvent)
-            async def on_like(event: LikeEvent):
-                self.logger.debug(f"Получен лайк от {event.user.nickname}")
-                try:
-                    item = TableItemView(
-                        timestamp=datetime.now(),
-                        name=event.user.nickname,
-                        event="лайк",
-                        alert_level=AlertLevel.NORMAL
-                    )
-                    self.add_item(item)
-                    if self.speech_like:
-                        like_text = self.settings.like_text.replace("@name", event.user.nickname)
-                        self.logger.debug(f"Озвучивание лайка: {like_text}")
-                        self.speech_service.speech(
-                            like_text,
-                            self.settings.speech_voice,
-                            self.settings.speech_rate
-                        )
-                except Exception as e:
-                    self.logger.error(f"Ошибка при обработке лайка: {str(e)}", exc_info=True)
-            @self.client.on(JoinEvent)
-            async def on_join(event: JoinEvent):
-                self.logger.debug(f"Новое подключение: {event.user.nickname}")
-                try:
-                    item = TableItemView(
-                        timestamp=datetime.now(),
-                        name=event.user.nickname,
-                        event="подключение",
-                        alert_level=AlertLevel.NORMAL
-                    )
-                    self.add_item(item)
-                    if self.speech_member:
-                        join_text = self.settings.join_text.replace("@name", event.user.nickname)
-                        self.logger.debug(f"Озвучивание подключения: {join_text}")
-                        self.speech_service.speech(
-                            join_text,
-                            self.settings.speech_voice,
-                            self.settings.speech_rate
-                        )
-                except Exception as e:
-                    self.logger.error(f"Ошибка при обработке подключения: {str(e)}", exc_info=True)
-            # Запускаем клиент и ждем завершения
-            self.logger.info("Запуск клиента TikTok Live")
-            self.client_task = self.loop.create_task(self.client.start())
-            self.logger.debug(f"Задача клиента создана: {self.client_task}")
-            # Используем условный цикл вместо бесконечного цикла
-            while not self.client_task.done() and not self.client_task.cancelled():
-                self.logger.debug(f"Состояние клиента: {self.client.connected}")
-                await asyncio.sleep(5)  # Проверяем состояние каждые 5 секунд
-            self.logger.debug("Цикл ожидания завершен")
-        except Exception as e:
-            self.logger.error(f"Ошибка при подключении к TikTok: {str(e)}", exc_info=True)
-            item = TableItemView(
-                timestamp=datetime.now(),
-                name="Система",
-                event=f"Ошибка: {str(e)}",
-                alert_level=AlertLevel.IMPORTANT
-            )
-            self.add_item(item)
-            self.error_handler.handle_tiktok_error(None, e)
-            self.is_monitoring = False
-            self.is_processing = False
-        finally:
-            self.logger.debug("Выполнение блока finally в методе _run_tiktok_client")
-            if self.client and self.client.connected:
-                try:
-                    self.logger.debug("Закрытие клиента TikTok")
-                    self.loop.run_until_complete(self.client.stop())
-                except Exception as e:
-                    self.logger.error(f"Ошибка при закрытии клиента TikTok: {str(e)}")
-                    self.error_handler.show_error_dialog(None, "Ошибка", "Ошибка при закрытии клиента TikTok", str(e))
-            if self.loop and self.loop.is_running():
-                self.logger.debug("Закрытие event loop")
-                try:
-                    self.loop.run_until_complete(self.loop.shutdown_asyncgens())
-                    self.loop.close()
-                except Exception as e:
-                    self.logger.error(f"Ошибка при закрытии event loop: {str(e)}")
-                    self.error_handler.show_error_dialog(None, "Ошибка", "Ошибка при закрытии event loop", str(e))
-            self.logger.debug("Завершение метода _run_tiktok_client")
+    def on_status_changed(self, status):
+        self.status_changed.emit(status)
+
+    def on_item_added(self, item):
+        self.add_item(item)
+
+    def on_thread_finished(self):
+        self.logger.debug("Поток завершен")
+        self.is_monitoring = False
+        self.is_processing = False
+        self.status_changed.emit("Мониторинг остановлен")
