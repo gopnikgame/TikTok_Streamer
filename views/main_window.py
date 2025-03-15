@@ -87,7 +87,7 @@ class MainWindow(QMainWindow):
             self.error_handler.show_error_dialog(self, "Ошибка инициализации интерфейса", 
                                               "Не удалось инициализировать пользовательский интерфейс", str(e))
         def create_monitoring_tab(self):
-        """Создает вкладку мониторинга"""
+            """Создает вкладку мониторинга"""
         try:
             tab = QWidget()
             layout = QVBoxLayout()
@@ -312,7 +312,7 @@ class MainWindow(QMainWindow):
             # В случае ошибки возвращаем пустой виджет
             return QWidget()
         def bind_events(self):
-        """Привязывает обработчики событий к изменениям ViewModel"""
+            """Привязывает обработчики событий к изменениям ViewModel"""
         try:
             self.viewmodel.add_callback('is_monitoring', self.update_monitoring_state)
             self.viewmodel.add_callback('item_list', self.update_events_table)
