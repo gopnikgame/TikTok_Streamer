@@ -1,17 +1,33 @@
-import sys
 import os
+import sys
+import locale
 import traceback
-import io
 from typing import Optional
-import logging
-import ctypes
 
-# Установка кодировки UTF-8 для стандартного вывода
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+# Устанавливаем переменную окружения PYTHONIOENCODING на utf-8
+os.environ["PYTHONIOENCODING"] = "utf-8"
+
+# Устанавливаем локаль на ru_RU.UTF-8
+try:
+    locale.setlocale(locale.LC_ALL, 'ru_RU.UTF-8')
+except locale.Error:
+    print("Локаль ru_RU.UTF-8 недоступна. Попробуем использовать ru_RU.utf8")
+    try:
+        locale.setlocale(locale.LC_ALL, 'ru_RU.utf8')
+    except locale.Error:
+        print("Локаль ru_RU.utf8 также недоступна. Используем системную локаль.")
+
+# Проверка текущей кодировки
+print(f"PYTHONIOENCODING: {os.environ.get('PYTHONIOENCODING', 'не установлена')}")
+print(f"sys.stdout.encoding: {sys.stdout.encoding}")
+print(f"sys.stderr.encoding: {sys.stderr.encoding}")
+print(f"sys.getfilesystemencoding(): {sys.getfilesystemencoding()}")
+print(f"locale.getpreferredencoding(): {locale.getpreferredencoding()}")
+print(f"locale.getlocale(): {locale.getlocale()}")
 
 # Настройка кодировки консоли для Windows
 if sys.platform == 'win32':
+    import ctypes
     k32 = ctypes.windll.kernel32
     k32.SetConsoleOutputCP(65001)  # 65001 - это код UTF-8
     k32.SetConsoleCP(65001)
@@ -37,27 +53,6 @@ except ImportError:
         
     show_error("Критическая ошибка", "Не удалось запустить приложение. Проверьте наличие всех файлов программы.")
     sys.exit(1)
-
-class Logger:
-    def __init__(self):
-        self.logger = logging.getLogger('TTStreamerPy')
-        self.logger.setLevel(logging.DEBUG)
-        
-        file_handler = logging.FileHandler('app.log', encoding='utf-8')
-        file_handler.setLevel(logging.DEBUG)
-        
-        console_handler = logging.StreamHandler(sys.stdout)
-        console_handler.setLevel(logging.DEBUG)
-        
-        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-        file_handler.setFormatter(formatter)
-        console_handler.setFormatter(formatter)
-        
-        self.logger.addHandler(file_handler)
-        self.logger.addHandler(console_handler)
-
-    def get_logger(self):
-        return self.logger
 
 def main():
     issues = StartupErrorHandler.check_environment()
