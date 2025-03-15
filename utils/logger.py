@@ -14,6 +14,9 @@ class Logger:
         return cls._instance
     
     def _initialize_logger(self):
+        # Логирование информации о системе и кодировках
+        self._log_system_info()
+        
         # Создаем директорию для логов, если её нет
         log_dir = "logs"
         if not os.path.exists(log_dir):
@@ -33,27 +36,6 @@ class Logger:
         file_handler.setFormatter(formatter)
         file_handler.setLevel(logging.DEBUG)
         
-        # Исправляем вывод в консоль для поддержки Unicode
-        # Проверяем текущую кодировку консоли
-        try:
-            # Для Windows установим кодировку консоли в UTF-8
-            if sys.platform == 'win32':
-                # Для Python 3.7+ можно использовать следующий способ:
-                sys.stdout.reconfigure(encoding='utf-8', errors='replace')
-                console_handler = logging.StreamHandler(sys.stdout)
-            else:
-                # Для других платформ просто используем стандартный обработчик
-                console_handler = logging.StreamHandler(sys.stdout)
-        except AttributeError:
-            # Для более старых версий Python, где метод reconfigure недоступен
-            console_handler = logging.StreamHandler(sys.stdout)
-            # Установим обработку ошибок кодирования на 'replace'
-            console_handler.setFormatter(logging.Formatter(log_format, None, 'replace'))
-        
-        console_handler.setLevel(logging.INFO)
-        if not hasattr(console_handler, 'formatter'):
-            console_handler.setFormatter(formatter)
-        
         # Создаем и настраиваем корневой логгер
         root_logger = logging.getLogger('TTStreamerPy')
         root_logger.setLevel(logging.DEBUG)
@@ -63,16 +45,83 @@ class Logger:
             root_logger.removeHandler(handler)
             
         root_logger.addHandler(file_handler)
-        root_logger.addHandler(console_handler)
+        
+        # Настраиваем вывод в консоль с учетом поддержки Unicode
+        try:
+            # Принудительно устанавливаем UTF-8 для всех платформ
+            os.environ["PYTHONIOENCODING"] = "utf-8"
+            
+            # Для Windows дополнительно настраиваем консоль
+            if sys.platform == 'win32':
+                # Для Python 3.7+ используем reconfigure
+                try:
+                    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+                    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+                except AttributeError:
+                    # Для старых версий Python просто продолжаем
+                    pass
+            
+            # Создаем консольный обработчик с явным указанием stdout
+            console_handler = logging.StreamHandler(sys.stdout)
+            console_handler.setLevel(logging.INFO)
+            console_handler.setFormatter(formatter)
+            root_logger.addHandler(console_handler)
+            
+            # Логируем успешную настройку консоли
+            root_logger.debug("Консольный обработчик логов настроен успешно")
+            
+        except Exception as e:
+            # В случае ошибки при настройке консоли, логируем это в файл
+            with open(os.path.join(log_dir, "console_error.log"), "w", encoding="utf-8") as f:
+                f.write(f"Ошибка при настройке консольного логирования: {str(e)}")
         
         # Предотвращаем дублирование логов
         root_logger.propagate = False
         
         # Сохраняем ссылку на корневой логгер
         self.root_logger = root_logger
+        
+        # Логируем завершение инициализации
+        root_logger.info("Логгер инициализирован успешно")
+    
+    def _log_system_info(self):
+        """Логирует информацию о системе и кодировках для диагностики"""
+        try:
+            info = [
+                f"Python версия: {sys.version}",
+                f"Платформа: {sys.platform}",
+                f"Кодировка файловой системы: {sys.getfilesystemencoding()}",
+                f"Кодировка стандартного вывода: {sys.stdout.encoding}",
+                f"Предпочтительная кодировка: {locale.getpreferredencoding()}",
+                f"Текущая локаль: {locale.getlocale()}",
+                f"Переменная окружения PYTHONIOENCODING: {os.environ.get('PYTHONIOENCODING', 'не установлена')}"
+            ]
+            
+            # Создаем директорию для логов, если её нет
+            log_dir = "logs"
+            if not os.path.exists(log_dir):
+                os.makedirs(log_dir)
+                
+            # Записываем информацию в отдельный файл
+            with open(os.path.join(log_dir, "system_info.log"), "w", encoding="utf-8") as f:
+                f.write("\n".join(info))
+                
+        except Exception as e:
+            # В случае ошибки, пишем в стандартный диагностический файл
+            try:
+                with open("logger_init_error.log", "w", encoding="utf-8") as f:
+                    f.write(f"Ошибка при логировании системной информации: {str(e)}")
+            except:
+                pass
     
     def get_logger(self, name=None):
         """Получает логгер с заданным именем (для компонентов приложения)"""
         if name:
-            return self.root_logger.getChild(name)
+            child_logger = self.root_logger.getChild(name)
+            # Проверяем кодировку и для дочерних логгеров
+            child_logger.debug(f"Дочерний логгер '{name}' создан. Проверка кодировки: тест кириллицы")
+            return child_logger
+        
+        # Тестовое сообщение для проверки кодировки
+        self.root_logger.debug("Проверка логгера: тест кириллицы")
         return self.root_logger
