@@ -60,12 +60,23 @@ def main():
             if not os.path.exists("assets"):
                 os.makedirs("assets")
                 logger.info("Создана директория assets")
+            else:
+                logger.debug("Директория assets уже существует")
         except Exception as e:
             error_handler.handle_file_error(None, e, "assets")
+            logger.error(f"Ошибка при создании директории assets: {str(e)}", exc_info=True)
         
         # Создаем приложение
-        app = QApplication(sys.argv)
-        app.setApplicationName("TTStreamerPy")
+        try:
+            app = QApplication(sys.argv)
+            app.setApplicationName("TTStreamerPy")
+            logger.debug("Создано приложение QApplication")
+        except Exception as e:
+            error_handler.show_error_dialog(None, "Критическая ошибка", 
+                                            "Не удалось создать приложение", 
+                                            str(e))
+            logger.critical(f"Критическая ошибка при создании QApplication: {str(e)}", exc_info=True)
+            sys.exit(1)
         
         try:
             # Создаем сервисы
@@ -95,6 +106,7 @@ def main():
     except Exception as e:
         # Обработка исключений на этапе импорта
         StartupErrorHandler.handle_startup_error(e)
+        logger.critical(f"Критическая ошибка на этапе импорта: {str(e)}", exc_info=True)
         sys.exit(1)
 
 if __name__ == "__main__":
@@ -103,4 +115,5 @@ if __name__ == "__main__":
     except Exception as e:
         # Отлов неперехваченных исключений самого верхнего уровня
         StartupErrorHandler.handle_startup_error(e)
+        logger.critical(f"Критическая ошибка самого верхнего уровня: {str(e)}", exc_info=True)
         sys.exit(1)
