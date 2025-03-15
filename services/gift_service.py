@@ -35,6 +35,8 @@ class GiftService:
                 with open(self.gift_file, 'r', encoding='utf-8') as f:
                     self.gift_dict = json.load(f)
                 self.logger.info(f"Загружено {len(self.gift_dict)} записей о подарках из файла")
+            else:
+                self.logger.debug(f"Файл {self.gift_file} не найден, инициализация пустого словаря")
         except Exception as e:
             self.logger.error(f"Ошибка при загрузке данных о подарках: {str(e)}", exc_info=True)
             self.error_handler.handle_file_error(None, e, self.gift_file)
@@ -52,22 +54,28 @@ class GiftService:
     
     def get(self, gift_id):
         """Получает данные подарка по ID"""
-        gift_id_str = str(gift_id)
-        
-        if gift_id_str in self.gift_dict:
-            data = self.gift_dict[gift_id_str]
-            self.logger.debug(f"Получены данные подарка ID {gift_id}")
-            return GiftData(id=gift_id, name=data['name'], image=data['image'])
-        
-        self.logger.debug(f"Данные подарка ID {gift_id} не найдены")
-        return None
+        try:
+            gift_id_str = str(gift_id)
+            
+            if gift_id_str in self.gift_dict:
+                data = self.gift_dict[gift_id_str]
+                self.logger.debug(f"Получены данные подарка ID {gift_id}: {data}")
+                return GiftData(id=gift_id, name=data['name'], image=data['image'])
+            
+            self.logger.debug(f"Данные подарка ID {gift_id} не найдены")
+            return None
+        except Exception as e:
+            self.logger.error(f"Ошибка при получении данных подарка ID {gift_id}: {str(e)}", exc_info=True)
+            return None
     
     async def create(self, gift_id, name, url):
         """Создает новую запись о подарке"""
         try:
+            self.logger.debug(f"Запуск создания данных подарка ID {gift_id}, имя: {name}, URL: {url}")
             # Используем aiohttp для асинхронного запроса
             async with aiohttp.ClientSession() as session:
                 try:
+                    self.logger.debug(f"Запрос изображения подарка по URL: {url}")
                     async with session.get(url) as response:
                         if response.status != 200:
                             error_msg = f"Ошибка при загрузке изображения подарка: HTTP {response.status}"
@@ -83,6 +91,7 @@ class GiftService:
                         }
                         
                         self.gift_dict[str(gift_id)] = gift_data
+                        self.logger.debug(f"Данные подарка ID {gift_id} добавлены в словарь: {gift_data}")
                         
                         # Сохраняем в файл асинхронно
                         loop = asyncio.get_event_loop()
@@ -103,6 +112,7 @@ class GiftService:
     def create_sync(self, gift_id, name, url):
         """Синхронный вариант метода create для использования из других потоков"""
         try:
+            self.logger.debug(f"Запуск синхронного создания данных подарка ID {gift_id}, имя: {name}, URL: {url}")
             # Создаем временный event loop для выполнения асинхронного кода
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
@@ -118,6 +128,7 @@ class GiftService:
     def delete(self, gift_id):
         """Удаляет данные о подарке"""
         try:
+            self.logger.debug(f"Запуск удаления данных подарка ID {gift_id}")
             gift_id_str = str(gift_id)
             
             if gift_id_str in self.gift_dict:
@@ -137,6 +148,7 @@ class GiftService:
     def get_all(self):
         """Возвращает словарь со всеми данными о подарках"""
         try:
+            self.logger.debug("Запуск получения всех данных о подарках")
             result = {}
             
             for gift_id_str, data in self.gift_dict.items():
@@ -154,6 +166,7 @@ class GiftService:
     def clear(self):
         """Очищает все данные о подарках"""
         try:
+            self.logger.debug("Запуск очистки данных о подарках")
             self.gift_dict = {}
             self._save_to_file()
             self.logger.info("Данные о подарках очищены")
