@@ -106,3 +106,7 @@ class SoundService:
                     self.logger.error(f"Файл не найден: {sound_path}")
             else:
                 self.logger.warning("Нет доступных звуков для воспроизведения")
+    
+    def get_mappings(self):
+        """Возвращает текущие привязки звуков к ID подарков"""
+        return self.store
