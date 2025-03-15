@@ -58,8 +58,11 @@ class Logger:
                     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
                     sys.stderr.reconfigure(encoding='utf-8', errors='replace')
                 except AttributeError:
-                    # Для старых версий Python просто продолжаем
-                    pass
+                    # Для старых версий Python используем ctypes
+                    import ctypes
+                    k32 = ctypes.windll.kernel32
+                    k32.SetConsoleOutputCP(65001)  # 65001 - это код UTF-8
+                    k32.SetConsoleCP(65001)
             
             # Создаем консольный обработчик с явным указанием stdout
             console_handler = logging.StreamHandler(sys.stdout)
