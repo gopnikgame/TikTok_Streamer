@@ -229,11 +229,6 @@ class MonitoringViewModel(Observable):
                 )
                 self.add_item(item)
             
-            # Обработчик ошибок
-            @self.client.on("error")
-            async def on_error(error):
-                self.logger.error(f"Ошибка клиента TikTok: {error}")
-            
             # Обработчики подарков, лайков и подключений (без изменений)
             @self.client.on(GiftEvent)
             async def on_gift(event: GiftEvent):
@@ -278,7 +273,7 @@ class MonitoringViewModel(Observable):
                             self.sound_service.play(event.gift.id, self.settings.notify_delay)
                 except Exception as e:
                     self.logger.error(f"Ошибка при обработке подарка: {str(e)}", exc_info=True)
-            
+        
             @self.client.on(LikeEvent)
             async def on_like(event: LikeEvent):
                 self.logger.debug(f"Получен лайк от {event.user.nickname}")
@@ -300,7 +295,7 @@ class MonitoringViewModel(Observable):
                         )
                 except Exception as e:
                     self.logger.error(f"Ошибка при обработке лайка: {str(e)}", exc_info=True)
-            
+        
             @self.client.on(JoinEvent)
             async def on_join(event: JoinEvent):
                 self.logger.debug(f"Новое подключение: {event.user.nickname}")
@@ -340,7 +335,7 @@ class MonitoringViewModel(Observable):
             self.error_handler.handle_tiktok_error(None, e)
             self.is_monitoring = False
             self.is_processing = False
-        
+    
         finally:
             self.logger.debug("Выполнение блока finally в методе _run_tiktok_client")
             if self.client and self.client.connected:
@@ -354,6 +349,7 @@ class MonitoringViewModel(Observable):
             if self.loop and self.loop.is_running():
                 self.logger.debug("Закрытие event loop")
                 try:
+                    self.loop.run_until_complete(self.loop.shutdown_asyncgens())
                     self.loop.close()
                 except Exception as e:
                     self.logger.error(f"Ошибка при закрытии event loop: {str(e)}")
