@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime
 from enum import IntEnum
-from PyQt6.QtWidgets import QComboBox, QSpinBox
 from utils.logger import Logger
 
 class AlertLevel(IntEnum):
@@ -14,10 +13,12 @@ class TableItemView:
     name: str
     event: str
     alert_level: AlertLevel = AlertLevel.NORMAL
+    gift_name: str = ""  # Название подарка
+    gift_image: str = ""  # base64-encoded изображение подарка
     
     def __post_init__(self):
         self.logger = Logger().get_logger('TableItemView')
-        self.logger.debug(f"Создан объект TableItemView: {self.timestamp} - {self.name} - {self.event} - {self.alert_level}")
+        self.logger.debug(f"Создан объект TableItemView: {self.timestamp} - {self.name} - {self.event} - {self.alert_level} - {self.gift_name} - {self.gift_image[:20]}...")
 
 @dataclass
 class GiftData:
