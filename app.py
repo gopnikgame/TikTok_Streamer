@@ -3,6 +3,14 @@ import os
 import traceback
 from typing import Optional
 
+# Настройка кодировки консоли для Windows
+if sys.platform == 'win32':
+    # Устанавливаем режим UTF-8 для консоли Windows
+    import ctypes
+    k32 = ctypes.windll.kernel32
+    k32.SetConsoleOutputCP(65001)  # 65001 - это код UTF-8
+    k32.SetConsoleCP(65001)
+
 # Импорт обработчика ошибок запуска
 try:
     from utils.startup_error_handler import StartupErrorHandler
@@ -17,7 +25,7 @@ except ImportError:
             pass
     
     try:
-        with open("startup_error.log", "w") as f:
+        with open("startup_error.log", "w", encoding="utf-8") as f:
             f.write(f"Критическая ошибка при импорте обработчика ошибок:\n")
             f.write(traceback.format_exc())
     except:
