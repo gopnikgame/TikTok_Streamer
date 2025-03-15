@@ -14,8 +14,9 @@ class Logger:
     
     def _initialize_logger(self):
         # Создаем директорию для логов, если её нет
-        if not os.path.exists("logs"):
-            os.makedirs("logs")
+        log_dir = "logs"
+        if not os.path.exists(log_dir):
+            os.makedirs(log_dir)
         
         # Настраиваем форматирование логов
         log_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -23,7 +24,7 @@ class Logger:
         
         # Настраиваем логирование в файл с ротацией
         file_handler = RotatingFileHandler(
-            "logs/app.log", 
+            os.path.join(log_dir, "app.log"), 
             maxBytes=10*1024*1024,  # 10 МБ
             backupCount=5
         )
@@ -36,16 +37,19 @@ class Logger:
         console_handler.setLevel(logging.INFO)
         
         # Создаем и настраиваем корневой логгер
-        self.logger = logging.getLogger('TTStreamerPy')
-        self.logger.setLevel(logging.DEBUG)
-        self.logger.addHandler(file_handler)
-        self.logger.addHandler(console_handler)
+        root_logger = logging.getLogger('TTStreamerPy')
+        root_logger.setLevel(logging.DEBUG)
+        root_logger.addHandler(file_handler)
+        root_logger.addHandler(console_handler)
         
         # Предотвращаем дублирование логов
-        self.logger.propagate = False
+        root_logger.propagate = False
+        
+        # Сохраняем ссылку на корневой логгер
+        self.root_logger = root_logger
     
     def get_logger(self, name=None):
         """Получает логгер с заданным именем (для компонентов приложения)"""
         if name:
-            return logging.getLogger(f'TTStreamerPy.{name}')
-        return self.logger
+            return self.root_logger.getChild(name)
+        return self.root_logger
