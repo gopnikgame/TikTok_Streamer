@@ -173,7 +173,7 @@ class MonitoringViewModel(Observable):
         self.is_monitoring = False
         self.logger.info("Мониторинг остановлен")
 
-    def _run_tiktok_client(self):
+    async def _run_tiktok_client(self):
         """Запускает клиент TikTok Live в отдельном потоке"""
         self.logger.debug("Запуск метода _run_tiktok_client")
         try:
