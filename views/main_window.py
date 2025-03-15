@@ -7,6 +7,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QAbstractTableModel, QModelIndex
 from PyQt6.QtGui import QStandardItemModel, QStandardItem
+from PyQt6 import sip
 from models.data_models import AlertLevel
 from utils.error_handler import ErrorHandler
 from utils.logger import Logger
@@ -326,12 +327,20 @@ class MainWindow(QMainWindow):
     def update_events_table(self):
         """Обновляет таблицу событий"""
         try:
-            self.table_model.layoutChanged.emit()
-            self.logger.debug("Таблица событий обновлена")
+            if hasattr(self, 'table_model') and self.table_model:
+                # Проверяем, что объект всё ещё существует и не был удалён
+                if sip.isdeleted(self.table_model):
+                    self.logger.warning("Объект table_model был удалён, создаём новый")
+                    return
+            
+                self.table_model.layoutChanged.emit()
+                self.logger.debug("Таблица событий обновлена")
         except Exception as e:
-            self.logger.error(f"Ошибка при обновлении таблицы событий: {str(e)}", exc_info=True)
-            self.error_handler.show_error_dialog(self, "Ошибка обновления таблицы", 
-                                             "Не удалось обновить таблицу событий", str(e))
+            self.logger.error(f"Ошибка при обновлении таблицы событий: {str(e)}")
+            try:
+                self.error_handler.handle_update_error(None, e)
+            except Exception as inner_e:
+                self.logger.error(f"Ошибка при обработке ошибки: {str(inner_e)}")
 
     def toggle_monitoring(self):
         """Включает или выключает мониторинг"""
@@ -511,3 +520,23 @@ class MainWindow(QMainWindow):
             self.logger.error(f"Ошибка при добавлении привязки звука: {str(e)}", exc_info=True)
             self.error_handler.show_error_dialog(self, "Ошибка привязки звука", 
                                              "Не удалось привязать звук к ID подарка", str(e))
+    def closeEvent(self, event):
+        """Обработчик события закрытия окна"""
+        self.logger.info("Закрытие главного окна")
+        try:
+            # Остановка мониторинга перед закрытием
+            if self.viewmodel.is_monitoring:
+                self.logger.debug("Остановка мониторинга перед закрытием окна")
+                self.viewmodel.stop_monitoring()
+        
+            # Освобождение ресурсов
+            if hasattr(self, 'table_model') and self.table_model:
+                self.logger.debug("Освобождение ресурсов таблицы")
+                self.table_view.setModel(None)  # Отсоединяем модель от представления
+        
+            # Вызываем стандартный обработчик закрытия окна
+            super().closeEvent(event)
+        except Exception as e:
+            self.logger.error(f"Ошибка при закрытии окна: {str(e)}")
+            # Принудительно завершаем приложение в случае ошибки
+            event.accept()
