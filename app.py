@@ -1,12 +1,17 @@
 import sys
 import os
 import traceback
+import io
 from typing import Optional
+import logging
+import ctypes
+
+# Установка кодировки UTF-8 для стандартного вывода
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 
 # Настройка кодировки консоли для Windows
 if sys.platform == 'win32':
-    # Устанавливаем режим UTF-8 для консоли Windows
-    import ctypes
     k32 = ctypes.windll.kernel32
     k32.SetConsoleOutputCP(65001)  # 65001 - это код UTF-8
     k32.SetConsoleCP(65001)
@@ -15,7 +20,6 @@ if sys.platform == 'win32':
 try:
     from utils.startup_error_handler import StartupErrorHandler
 except ImportError:
-    # Если не удается импортировать обработчик, используем базовые функции
     def show_error(title: str, message: str) -> None:
         print(f"{title}: {message}")
         try:
@@ -34,20 +38,38 @@ except ImportError:
     show_error("Критическая ошибка", "Не удалось запустить приложение. Проверьте наличие всех файлов программы.")
     sys.exit(1)
 
+class Logger:
+    def __init__(self):
+        self.logger = logging.getLogger('TTStreamerPy')
+        self.logger.setLevel(logging.DEBUG)
+        
+        file_handler = logging.FileHandler('app.log', encoding='utf-8')
+        file_handler.setLevel(logging.DEBUG)
+        
+        console_handler = logging.StreamHandler(sys.stdout)
+        console_handler.setLevel(logging.DEBUG)
+        
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        file_handler.setFormatter(formatter)
+        console_handler.setFormatter(formatter)
+        
+        self.logger.addHandler(file_handler)
+        self.logger.addHandler(console_handler)
+
+    def get_logger(self):
+        return self.logger
+
 def main():
-    # Проверка окружения перед импортом остальных модулей
     issues = StartupErrorHandler.check_environment()
     if issues:
         error_message = StartupErrorHandler.format_error_message(issues)
         StartupErrorHandler.show_error_messagebox("Проблемы с зависимостями", error_message)
         sys.exit(1)
     
-    # Только после проверки окружения импортируем остальные модули
     try:
         from PyQt6.QtWidgets import QApplication
         from PyQt6.QtGui import QIcon
         
-        # Импортируем компоненты
         from services.speech_service import SpeechService
         from services.sound_service import SoundService
         from services.gift_service import GiftService
@@ -56,14 +78,11 @@ def main():
         from utils.logger import Logger
         from utils.error_handler import ErrorHandler
         
-        # Инициализируем логгер
         logger = Logger().get_logger()
         logger.info("Запуск приложения TTStreamerPy")
         
-        # Инициализируем обработчик ошибок
         error_handler = ErrorHandler()
         
-        # Создаем папку для ассетов, если её нет
         try:
             if not os.path.exists("assets"):
                 os.makedirs("assets")
@@ -74,7 +93,6 @@ def main():
             error_handler.handle_file_error(None, e, "assets")
             logger.error(f"Ошибка при создании директории assets: {str(e)}", exc_info=True)
         
-        # Создаем приложение
         try:
             app = QApplication(sys.argv)
             app.setApplicationName("TTStreamerPy")
@@ -87,23 +105,19 @@ def main():
             sys.exit(1)
         
         try:
-            # Создаем сервисы
             logger.debug("Инициализация сервисов")
             speech_service = SpeechService()
             sound_service = SoundService()
             gift_service = GiftService()
             
-            # Создаем ViewModel
             logger.debug("Инициализация ViewModel")
             monitoring_viewmodel = MonitoringViewModel(speech_service, sound_service, gift_service)
             
-            # Создаем и показываем главное окно
             logger.debug("Создание главного окна")
             main_window = MainWindow(monitoring_viewmodel)
             main_window.show()
             logger.info("Приложение запущено")
             
-            # Запускаем цикл обработки событий
             sys.exit(app.exec())
         except Exception as e:
             error_handler.show_error_dialog(None, "Критическая ошибка", 
@@ -112,7 +126,6 @@ def main():
             logger.critical(f"Критическая ошибка при запуске: {str(e)}", exc_info=True)
             sys.exit(1)
     except Exception as e:
-        # Обработка исключений на этапе импорта
         StartupErrorHandler.handle_startup_error(e)
         logger.critical(f"Критическая ошибка на этапе импорта: {str(e)}", exc_info=True)
         sys.exit(1)
@@ -121,7 +134,6 @@ if __name__ == "__main__":
     try:
         main()
     except Exception as e:
-        # Отлов неперехваченных исключений самого верхнего уровня
         StartupErrorHandler.handle_startup_error(e)
         logger.critical(f"Критическая ошибка самого верхнего уровня: {str(e)}", exc_info=True)
         sys.exit(1)
