@@ -138,11 +138,19 @@ class MonitoringViewModel(Observable):
 
     def add_item(self, item):
         """Добавляет новое событие в список"""
-        self.item_list.insert(0, item)
-        if len(self.item_list) > 1000:
-            self.item_list.pop()
-        self.logger.debug(f"Добавлено событие: {item.timestamp} - {item.name} - {item.event}")
-        self.notify_property_changed('item_list')
+        try:
+            self.item_list.insert(0, item)
+            if len(self.item_list) > 1000:
+                self.item_list.pop()
+            self.logger.debug(f"Добавлено событие: {item.timestamp} - {item.name} - {item.event}")
+            
+            # Безопасное уведомление об изменении свойства
+            try:
+                self.notify_property_changed('item_list')
+            except Exception as notify_error:
+                self.logger.error(f"Ошибка при уведомлении об изменении списка: {str(notify_error)}")
+        except Exception as e:
+            self.logger.error(f"Ошибка при добавлении события в список: {str(e)}")
 
     def start_monitoring(self):
         """Запускает мониторинг стрима TikTok"""
@@ -158,15 +166,26 @@ class MonitoringViewModel(Observable):
         self.is_processing = True
         self.item_list.clear()
         self.notify_property_changed('item_list')
-        # Запускаем клиент TikTok в отдельном потоке
-        threading.Thread(target=self._run_tiktok_client, daemon=True).start()
+        
+        # Создаем функцию-обёртку для запуска асинхронного кода
+        def run_async_tiktok():
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                loop.run_until_complete(self._run_tiktok_client())
+            finally:
+                loop.close()
+        
+        # Запускаем в отдельном потоке
+        threading.Thread(target=run_async_tiktok, daemon=True).start()
 
     def stop_monitoring(self):
         """Останавливает мониторинг стрима"""
         if self.client and self.client.connected:
             try:
                 self.logger.info("Остановка мониторинга стрима")
-                asyncio.run_coroutine_threadsafe(self.client.stop(), self.loop)
+                # Используем disconnect вместо stop, так как stop отсутствует
+                asyncio.run_coroutine_threadsafe(self.client.disconnect(), self.loop)
             except Exception as e:
                 self.logger.error(f"Ошибка при остановке клиента: {str(e)}")
                 self.error_handler.handle_tiktok_error(None, e)
@@ -179,9 +198,8 @@ class MonitoringViewModel(Observable):
         try:
             self.logger.debug("Создание нового event loop для TikTok клиента")
             # Создаем новый event loop для асинхронного кода
-            self.loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(self.loop)
-            self.logger.debug(f"Создан новый event loop: {self.loop}")
+            self.loop = asyncio.get_event_loop()
+            self.logger.debug(f"Получен event loop: {self.loop}")
             # Создаем клиент и регистрируем обработчики событий
             self.logger.debug(f"Инициализация TikTokLiveClient для {self.stream}")
             self.client = TikTokLiveClient(self.stream)
