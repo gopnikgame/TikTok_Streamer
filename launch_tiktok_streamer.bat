@@ -2,163 +2,16 @@
 chcp 65001 > nul
 setlocal enabledelayedexpansion
 title TikTok Streamer Launcher
-
 :: Установка цветовых схем
 color 0A
-
 :: Создаем временную папку для скачивания
 if not exist ".\temp" mkdir ".\temp"
-
 echo ===============================================================
 echo           TikTok Streamer - Запуск приложения
 echo ===============================================================
 echo.
 
-:: Проверяем права администратора
-echo [*] Проверка прав администратора...
-net session >nul 2>&1
-if !ERRORLEVEL! neq 0 (
-    echo [!] Внимание: Скрипт запущен без прав администратора
-    echo [!] Для установки системных компонентов рекомендуется запустить от имени администратора
-    echo [!] Некоторые функции могут работать некорректно
-    echo.
-    choice /C YN /M "Продолжить без прав администратора?"
-    if !ERRORLEVEL! equ 2 (
-        exit /b 1
-    )
-)
-
-:: Проверяем Windows версию для определения метода установки UCRT
-for /f "tokens=4-5 delims=. " %%i in ('ver') do set VERSION=%%i.%%j
-echo [*] Обнаружена Windows версии !VERSION!
-
-:: Определяем нужные компоненты на основе версии Windows
-set NEED_UCRT_UPDATE=0
-if "!VERSION!"=="6.1" set NEED_UCRT_UPDATE=1
-if "!VERSION!"=="6.2" set NEED_UCRT_UPDATE=1
-if "!VERSION!"=="6.3" set NEED_UCRT_UPDATE=1
-
-:: Проверяем наличие Visual C++ Redistributable
-echo [*] Проверка наличия Microsoft Visual C++ Redistributable...
-set NEED_VCREDIST=0
-if not exist "%SystemRoot%\System32\vcruntime140.dll" (
-    echo [-] Visual C++ Redistributable не установлен!
-    set NEED_VCREDIST=1
-) else (
-    echo [+] Visual C++ Redistributable найден
-)
-
-:: Проверяем наличие конкретных файлов Universal C Runtime (api-ms-win-crt*.dll)
-echo [*] Проверка наличия Universal C Runtime (UCRT)...
-set NEED_UCRT=0
-
-:: Проверяем наличие конкретных DLL, которые отсутствуют
-set CRT_MISSING=0
-if not exist "%SystemRoot%\System32\api-ms-win-crt-runtime-l1-1-0.dll" set CRT_MISSING=1
-if not exist "%SystemRoot%\System32\api-ms-win-crt-stdio-l1-1-0.dll" set CRT_MISSING=1
-if not exist "%SystemRoot%\System32\api-ms-win-crt-math-l1-1-0.dll" set CRT_MISSING=1
-
-:: Выводим результаты проверки UCRT
-if !CRT_MISSING! EQU 1 (
-    echo [-] Отсутствуют критически важные файлы Universal C Runtime (UCRT)
-    echo [-] Требуется установка UCRT вручную
-    set NEED_UCRT=1
-) else (
-    echo [+] Universal C Runtime (UCRT) в порядке
-)
-
-:: Считаем общее количество api-ms-win-crt*.dll файлов (для диагностики)
-set API_MS_DLL_COUNT=0
-for /f %%a in ('dir /b "%SystemRoot%\System32\api-ms-win-crt*.dll" 2^>^&1 ^| find /c /v ""') do (
-    set API_MS_DLL_COUNT=%%a
-)
-echo [*] Найдено файлов api-ms-win-crt*.dll: !API_MS_DLL_COUNT!
-
-:: Устанавливаем необходимые компоненты
-if !NEED_VCREDIST! EQU 1 goto install_vcredist
-if !NEED_UCRT! EQU 1 goto manual_install_ucrt
-
-:: Если все компоненты установлены, переходим к проверке Python
-goto check_python
-
-:install_vcredist
-echo.
-echo [*] Необходима установка Microsoft Visual C++ Redistributable...
-
-:: Устанавливаем все необходимые версии Visual C++ Redistributable
-echo [*] Установка различных версий Visual C++ Redistributable...
-
-:: Современная версия 2015-2022 (x64)
-echo [*] Скачиваем Visual C++ Redistributable 2015-2022 (x64)...
-powershell -Command "& {[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri 'https://aka.ms/vs/17/release/vc_redist.x64.exe' -OutFile '.\temp\vc_redist_2022_x64.exe'}"
-if !ERRORLEVEL! neq 0 (
-    echo [-] Ошибка при скачивании Visual C++ Redistributable 2015-2022 (x64).
-) else (
-    echo [*] Устанавливаем Visual C++ Redistributable 2015-2022 (x64)...
-    start /wait "VC Redist 2022 x64" ".\temp\vc_redist_2022_x64.exe" /install /quiet /norestart
-)
-
-:: Современная версия 2015-2022 (x86) - иногда нужна даже на 64-битных системах
-echo [*] Скачиваем Visual C++ Redistributable 2015-2022 (x86)...
-powershell -Command "& {[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri 'https://aka.ms/vs/17/release/vc_redist.x86.exe' -OutFile '.\temp\vc_redist_2022_x86.exe'}"
-if !ERRORLEVEL! neq 0 (
-    echo [-] Ошибка при скачивании Visual C++ Redistributable 2015-2022 (x86).
-) else (
-    echo [*] Устанавливаем Visual C++ Redistributable 2015-2022 (x86)...
-    start /wait "VC Redist 2022 x86" ".\temp\vc_redist_2022_x86.exe" /install /quiet /norestart
-)
-
-:: VS2015 версия (x64), которая часто требуется именно для UCRT
-echo [*] Скачиваем Visual C++ Redistributable 2015 Update 3 (x64)...
-powershell -Command "& {[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri 'https://download.microsoft.com/download/6/A/A/6AA4EDFF-645B-48C5-81CC-ED5963AEAD48/vc_redist.x64.exe' -OutFile '.\temp\vc_redist_2015_x64.exe'}"
-if !ERRORLEVEL! neq 0 (
-    echo [-] Ошибка при скачивании Visual C++ Redistributable 2015 Update 3 (x64).
-) else (
-    echo [*] Устанавливаем Visual C++ Redistributable 2015 Update 3 (x64)...
-    start /wait "VC Redist 2015 x64" ".\temp\vc_redist_2015_x64.exe" /install /quiet /norestart
-)
-
-:: VS2015 версия (x86)
-echo [*] Скачиваем Visual C++ Redistributable 2015 Update 3 (x86)...
-powershell -Command "& {[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri 'https://download.microsoft.com/download/6/A/A/6AA4EDFF-645B-48C5-81CC-ED5963AEAD48/vc_redist.x86.exe' -OutFile '.\temp\vc_redist_2015_x86.exe'}"
-if !ERRORLEVEL! neq 0 (
-    echo [-] Ошибка при скачивании Visual C++ Redistributable 2015 Update 3 (x86).
-) else (
-    echo [*] Устанавливаем Visual C++ Redistributable 2015 Update 3 (x86)...
-    start /wait "VC Redist 2015 x86" ".\temp\vc_redist_2015_x86.exe" /install /quiet /norestart
-)
-
-echo [+] Установка Microsoft Visual C++ Redistributable завершена.
-
-:: Проверяем, решило ли это проблему с UCRT
-set CRT_FIXED=0
-if exist "%SystemRoot%\System32\api-ms-win-crt-runtime-l1-1-0.dll" if exist "%SystemRoot%\System32\api-ms-win-crt-stdio-l1-1-0.dll" if exist "%SystemRoot%\System32\api-ms-win-crt-math-l1-1-0.dll" set CRT_FIXED=1
-
-if !CRT_FIXED! EQU 1 (
-    echo [+] Установка Visual C++ Redistributable успешно решила проблему с отсутствующими DLL!
-    echo [+] Все необходимые компоненты UCRT установлены.
-    goto check_python
-) else (
-    echo [-] После установки Visual C++ Redistributable всё еще отсутствуют компоненты UCRT
-    if !NEED_UCRT! EQU 1 goto manual_install_ucrt
-    goto check_python
-)
-
-:manual_install_ucrt
-echo.
-echo [*] Необходима установка Universal C Runtime (UCRT)...
-echo.
-echo [!] UCRT нужно установить вручную
-echo [!] Пожалуйста, скачайте и установите:
-echo [!] 1. Visual C++ Redistributable: https://aka.ms/vs/17/release/vc_redist.x64.exe
-echo [!] 2. Universal C Runtime Update: https://support.microsoft.com/ru-ru/help/2999226/update-for-universal-c-runtime-in-windows
-echo.
-echo [!] После установки перезапустите скрипт
-echo.
-pause
-exit /b 1
-
-:check_python
+:: Проверяем наличие Python
 echo [*] Проверка наличия Python...
 where python >nul 2>&1
 if !ERRORLEVEL! neq 0 (
@@ -174,28 +27,106 @@ if "!PY_VERSION!"=="" (
     echo [-] Не удалось определить версию Python.
     goto install_python
 )
-
 for /f "tokens=1,2 delims=." %%I in ("!PY_VERSION!") do (
     set PY_MAJOR=%%I
     set PY_MINOR=%%J
 )
-
 echo [*] Версия Python: !PY_MAJOR!.!PY_MINOR!
-
 if !PY_MAJOR! LSS 3 (
     echo [-] Версия Python слишком старая. Требуется Python 3.8 или выше.
     goto install_python
 )
-
 if !PY_MAJOR! EQU 3 (
     if !PY_MINOR! LSS 8 (
         echo [-] Версия Python слишком старая. Требуется Python 3.8 или выше.
         goto install_python
     )
 )
-
 echo [+] Версия Python соответствует требованиям.
-goto check_deps
+
+:: Проверяем наличие папки assets
+if not exist "assets" (
+    echo [*] Создание папки assets...
+    mkdir "assets"
+    echo [+] Папка assets создана.
+) else (
+    echo [+] Папка assets уже существует.
+)
+
+:: Проверка и установка зависимостей
+echo [*] Проверка и установка зависимостей...
+:: Обновляем pip
+echo [*] Обновление pip...
+python -m pip install --upgrade pip >nul 2>&1
+if !ERRORLEVEL! neq 0 (
+    echo [-] Ошибка при обновлении pip.
+    goto check_deps_error
+)
+
+:: Проверяем, существует ли файл requirements.txt
+if not exist "requirements.txt" (
+    echo [-] Файл requirements.txt не найден!
+    echo [*] Создаем файл requirements.txt с необходимыми зависимостями...
+    (
+        echo PyQt6>=6.5.0
+        echo pyttsx3>=2.90
+        echo pygame>=2.5.0
+        echo TikTokLive==6.4.4
+        echo aiohttp>=3.8.0
+        echo requests>=2.28.0
+    ) > requirements.txt
+    echo [+] Файл requirements.txt создан.
+)
+
+:: Устанавливаем зависимости из requirements.txt
+echo [*] Установка зависимостей из requirements.txt...
+python -m pip install -r requirements.txt >nul 2>&1
+if !ERRORLEVEL! neq 0 (
+    echo [-] Ошибка при установке зависимостей.
+    echo [*] Пробуем установить основные компоненты напрямую...
+    for %%m in (PyQt6 pyttsx3 pygame TikTokLive aiohttp requests) do (
+        echo [*] Установка %%m...
+        python -m pip install %%m >nul 2>&1
+        if !ERRORLEVEL! neq 0 (
+            echo [-] Ошибка при установке %%m.
+            goto check_deps_error
+        )
+    )
+)
+
+:: Проверяем установку каждой зависимости
+set DEPS_OK=1
+echo [*] Проверка установки зависимостей...
+for %%m in (PyQt6 pyttsx3 pygame TikTokLive aiohttp requests) do (
+    python -c "import %%m" >nul 2>&1 || (
+        echo [-] Модуль %%m не установлен!
+        set DEPS_OK=0
+    )
+)
+if !DEPS_OK! EQU 0 (
+    echo [-] Не все зависимости установлены правильно!
+    echo [!] Попробуйте запустить скрипт от имени администратора или установите их вручную:
+    echo [!] pip install -r requirements.txt
+    goto check_deps_error
+) else (
+    echo [+] Все зависимости успешно установлены.
+)
+
+:: Запускаем приложение
+echo.
+echo [*] Запуск приложения TikTok Streamer...
+echo.
+python app.py
+if !ERRORLEVEL! neq 0 (
+    echo.
+    echo [-] Произошла ошибка при запуске приложения.
+    echo [!] Проверьте файл error.log, если он существует.
+    goto run_error
+)
+
+echo [+] Приложение успешно запущено.
+pause
+exit /b 0
 
 :install_python
 echo [*] Скачивание и установка Python 3.10...
@@ -203,7 +134,6 @@ echo [*] Скачивание и установка Python 3.10...
 if exist ".\temp\python_installer.exe" (
     del /f /q ".\temp\python_installer.exe"
 )
-
 powershell -Command "& {[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri 'https://www.python.org/ftp/python/3.10.11/python-3.10.11-amd64.exe' -OutFile '.\temp\python_installer.exe'}"
 if !ERRORLEVEL! neq 0 (
     echo [-] Ошибка при скачивании Python. Проверьте подключение к интернету.
@@ -227,91 +157,21 @@ if !ERRORLEVEL! neq 0 (
 
 :: Обновляем переменную PATH для текущей сессии
 set "PATH=%PATH%;%USERPROFILE%\AppData\Local\Programs\Python\Python310\Scripts;%USERPROFILE%\AppData\Local\Programs\Python\Python310"
-
 echo [+] Python 3.10 успешно установлен.
 echo [!] Пожалуйста, перезапустите этот скрипт для продолжения.
 echo [!] Не забудьте ЗАКРЫТЬ И ОТКРЫТЬ ЗАНОВО командную строку/PowerShell!
 pause
 exit /b 0
 
-:check_deps
-echo.
-echo [*] Проверка и установка зависимостей...
-
-:: Обновляем pip
-echo [*] Обновление pip...
-python -m pip install --upgrade pip >nul
-
-:: Проверяем, существует ли файл requirements.txt
-if not exist "requirements.txt" (
-    echo [-] Файл requirements.txt не найден!
-    echo [*] Создаем файл requirements.txt с необходимыми зависимостями...
-    
-    (
-        echo PyQt6>=6.5.0
-        echo pyttsx3>=2.90
-        echo pygame>=2.5.0
-        echo TikTokLive==6.4.4
-        echo aiohttp>=3.8.0
-        echo requests>=2.28.0
-    ) > requirements.txt
-    
-    echo [+] Файл requirements.txt создан.
-)
-
-:: Устанавливаем зависимости из requirements.txt
-echo [*] Установка зависимостей из requirements.txt...
-python -m pip install -r requirements.txt
-if !ERRORLEVEL! neq 0 (
-    echo [-] Ошибка при установке зависимостей.
-    echo [*] Пробуем установить основные компоненты напрямую...
-    
-    for %%m in (PyQt6 pyttsx3 pygame TikTokLive aiohttp requests) do (
-        python -m pip install %%m
-        if !ERRORLEVEL! neq 0 (
-            echo [-] Ошибка при установке %%m.
-        )
-    )
-)
-
-echo.
-echo [*] Проверка установки зависимостей...
-set DEPS_OK=1
-
-:: Проверяем установку каждой зависимости
-for %%m in (PyQt6 pyttsx3 pygame TikTokLive aiohttp requests) do (
-    python -c "import %%m" >nul 2>&1 || (
-        echo [-] Модуль %%m не установлен!
-        set DEPS_OK=0
-    )
-)
-
-if !DEPS_OK! EQU 0 (
-    echo [-] Не все зависимости установлены правильно!
-    echo [!] Попробуйте запустить скрипт от имени администратора или установите их вручную:
-    echo [!] pip install -r requirements.txt
-    pause
-    exit /b 1
-) else (
-    echo [+] Все зависимости успешно установлены.
-)
-
-:: Проверяем наличие папки assets
-if not exist "assets" (
-    echo [*] Создание папки assets...
-    mkdir "assets"
-)
-
-:: Запускаем приложение
-echo.
-echo [*] Запуск приложения TikTok Streamer...
-echo.
-python app.py
-if !ERRORLEVEL! neq 0 (
-    echo.
-    echo [-] Произошла ошибка при запуске приложения.
-    echo [!] Проверьте файл error.log, если он существует.
-)
-
+:check_deps_error
+echo [!] Ошибка при установке зависимостей.
+echo [!] Пожалуйста, установите зависимости вручную:
+echo [!] pip install -r requirements.txt
 pause
-exit /b 0
+exit /b 1
+
+:run_error
+echo [!] Ошибка при запуске приложения.
+echo [!] Пожалуйста, проверьте файл error.log, если он существует.
+pause
+exit /b 1
