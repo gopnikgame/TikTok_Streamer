@@ -28,6 +28,7 @@ class MonitoringWorker(QObject):
         self.loop = None
         self.is_monitoring = False
         self.is_processing = False
+        self._shutdown_requested = False  # Новый флаг для отслеживания запроса на завершение
 
     def run(self):
         self.logger.debug("Запуск метода run в MonitoringWorker")
@@ -37,8 +38,27 @@ class MonitoringWorker(QObject):
             loop.run_until_complete(self._run_tiktok_client())
         except asyncio.CancelledError:
             self.logger.debug("Работа была отменена")
-        finally:
-            loop.close()
+        except Exception as e:
+            self.logger.error(f"Ошибка в основном цикле: {str(e)}", exc_info=True)
+        # НЕ закрываем loop в finally, это должно происходить только через request_shutdown
+
+    async def request_shutdown(self):
+        """Безопасный метод для запроса завершения работы"""
+        self.logger.debug("Получен запрос на завершение работы")
+        self._shutdown_requested = True
+        
+        if self.client and self.client.connected:
+            try:
+                self.logger.debug("Отключение клиента TikTok")
+                await asyncio.wait_for(self.client.disconnect(), timeout=2.0)
+            except (asyncio.TimeoutError, Exception) as e:
+                self.logger.warning(f"Проблема при отключении клиента: {str(e)}")
+        
+        if self.client_task and not self.client_task.done():
+            self.logger.debug("Отмена задачи клиента")
+            self.client_task.cancel()
+        
+        return True  # Сигнализируем об успешной обработке запроса
 
     async def _run_tiktok_client(self):
         self.logger.debug("Запуск метода _run_tiktok_client")
@@ -160,8 +180,15 @@ class MonitoringWorker(QObject):
 
             self.logger.info("Запуск клиента TikTok Live")
             self.client_task = self.loop.create_task(self.client.start())
-            while not self.client_task.done() and not self.client_task.cancelled():
-                await asyncio.sleep(5)
+            
+            # Основной цикл работы
+            while not self.client_task.done() and not self.client_task.cancelled() and not self._shutdown_requested:
+                await asyncio.sleep(1)  # Уменьшаем интервал для более быстрой реакции на shutdown
+                
+                # Проверяем статус клиента во время выполнения
+                if not self.client.connected and not self._shutdown_requested:
+                    self.logger.warning("Соединение с TikTok было разорвано")
+                    break
         except asyncio.CancelledError:
             self.logger.debug("Асинхронная задача была отменена")
         except Exception as e:
@@ -177,23 +204,27 @@ class MonitoringWorker(QObject):
             self.is_monitoring = False
             self.is_processing = False
         finally:
+            # ⚠️ Аккуратно выполняем очистку без закрытия event loop
             self.logger.debug("Выполнение блока finally в методе _run_tiktok_client")
+            
+            # Отключаем клиента, если он всё ещё подключен
             if self.client and self.client.connected:
                 try:
                     self.logger.debug("Закрытие клиента TikTok")
-                    await self.client.disconnect()  # Используем метод disconnect вместо несуществующего stop
-                except Exception as e:
-                    self.logger.error(f"Ошибка при закрытии клиента TikTok: {str(e)}")
-                    self.error_handler.show_error_dialog(None, "Ошибка", "Ошибка при закрытии клиента TikTok", str(e))
+                    # Используем wait_for с небольшим таймаутом, чтобы не блокировать завершение
+                    await asyncio.wait_for(self.client.disconnect(), timeout=1.0)
+                except (asyncio.TimeoutError, Exception) as e:
+                    self.logger.warning(f"Не удалось корректно закрыть клиент TikTok: {str(e)}")
+            
+            # Очищаем ресурсы без закрытия loop
             if self.loop and self.loop.is_running():
-                self.logger.debug("Закрытие event loop")
                 try:
-                    await self.loop.shutdown_asyncgens()
-                except Exception as e:
-                    self.logger.error(f"Ошибка при закрытии асинхронных генераторов: {str(e)}")
-                finally:
-                    self.loop.stop()  # Останавливаем event loop
-                    self.logger.debug("Event loop остановлен")
-                    self.loop.close()
-                    self.logger.debug("Event loop закрыт")
+                    self.logger.debug("Очистка асинхронных генераторов")
+                    # Используем небольшой таймаут для shutdown_asyncgens
+                    await asyncio.wait_for(self.loop.shutdown_asyncgens(), timeout=1.0)
+                except (asyncio.TimeoutError, Exception) as e:
+                    self.logger.warning(f"Не удалось корректно закрыть асинхронные генераторы: {str(e)}")
+                
+                # НЕ останавливаем и не закрываем loop здесь!
+                    
             self.logger.debug("Завершение метода _run_tiktok_client")
