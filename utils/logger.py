@@ -3,6 +3,7 @@ import logging
 from logging.handlers import RotatingFileHandler
 import sys
 import locale
+import aiofiles
 
 class Logger:
     _instance = None
@@ -10,12 +11,12 @@ class Logger:
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super(Logger, cls).__new__(cls)
-            cls._instance._initialize_logger()
+            asyncio.run(cls._instance._initialize_logger())
         return cls._instance
     
-    def _initialize_logger(self):
+    async def _initialize_logger(self):
         # Логирование информации о системе и кодировках
-        self._log_system_info()
+        await self._log_system_info()
         
         # Создаем директорию для логов, если её нет
         log_dir = "logs"
@@ -63,7 +64,7 @@ class Logger:
                     k32 = ctypes.windll.kernel32
                     k32.SetConsoleOutputCP(65001)  # 65001 - это код UTF-8
                     k32.SetConsoleCP(65001)
-            
+                
             # Создаем консольный обработчик с явным указанием stdout
             console_handler = logging.StreamHandler(sys.stdout)
             console_handler.setLevel(logging.INFO)
@@ -75,8 +76,8 @@ class Logger:
             
         except Exception as e:
             # В случае ошибки при настройке консоли, логируем это в файл
-            with open(os.path.join(log_dir, "console_error.log"), "w", encoding="utf-8") as f:
-                f.write(f"Ошибка при настройке консольного логирования: {str(e)}")
+            async with aiofiles.open(os.path.join(log_dir, "console_error.log"), "w", encoding="utf-8") as f:
+                await f.write(f"Ошибка при настройке консольного логирования: {str(e)}")
         
         # Предотвращаем дублирование логов
         root_logger.propagate = False
@@ -87,8 +88,10 @@ class Logger:
         # Логируем завершение инициализации
         root_logger.info("Логгер инициализирован успешно")
     
-    def _log_system_info(self):
-        """Логирует информацию о системе и кодировках для диагностики"""
+    async def _log_system_info(self):
+        """
+        Логирует информацию о системе и кодировках для диагностики
+        """
         try:
             info = [
                 f"Python версия: {sys.version}",
@@ -106,19 +109,21 @@ class Logger:
                 os.makedirs(log_dir)
                 
             # Записываем информацию в отдельный файл
-            with open(os.path.join(log_dir, "system_info.log"), "w", encoding="utf-8") as f:
-                f.write("\n".join(info))
+            async with aiofiles.open(os.path.join(log_dir, "system_info.log"), "w", encoding="utf-8") as f:
+                await f.write("\n".join(info))
                 
         except Exception as e:
             # В случае ошибки, пишем в стандартный диагностический файл
             try:
-                with open("logger_init_error.log", "w", encoding="utf-8") as f:
-                    f.write(f"Ошибка при логировании системной информации: {str(e)}")
+                async with aiofiles.open("logger_init_error.log", "w", encoding="utf-8") as f:
+                    await f.write(f"Ошибка при логировании системной информации: {str(e)}")
             except:
                 pass
     
     def get_logger(self, name=None):
-        """Получает логгер с заданным именем (для компонентов приложения)"""
+        """
+        Получает логгер с заданным именем (для компонентов приложения)
+        """
         if name:
             child_logger = self.root_logger.getChild(name)
             # Проверяем кодировку и для дочерних логгеров
