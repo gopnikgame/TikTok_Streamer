@@ -1,5 +1,6 @@
 import json
 import os
+import aiofiles
 
 class Settings:
     _instance = None
@@ -7,14 +8,14 @@ class Settings:
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super(Settings, cls).__new__(cls)
-            cls._instance._load_settings()
+            asyncio.run(cls._instance._load_settings())
         return cls._instance
     
-    def _load_settings(self):
+    async def _load_settings(self):
         self.settings_file = "settings.json"
         if os.path.exists(self.settings_file):
-            with open(self.settings_file, 'r', encoding='utf-8') as f:
-                settings = json.load(f)
+            async with aiofiles.open(self.settings_file, 'r', encoding='utf-8') as f:
+                settings = json.loads(await f.read())
         else:
             settings = {}
             
@@ -30,7 +31,7 @@ class Settings:
         self.join_text = settings.get("join_text", "@name подключился к стриму")
         self.like_text = settings.get("like_text", "@name поставил лайк")
     
-    def save(self):
+    async def save(self):
         settings = {
             "user_id": self.user_id,
             "notify_gift": self.notify_gift,
@@ -44,5 +45,5 @@ class Settings:
             "like_text": self.like_text
         }
         
-        with open(self.settings_file, 'w', encoding='utf-8') as f:
-            json.dump(settings, f, indent=2, ensure_ascii=False)
+        async with aiofiles.open(self.settings_file, 'w', encoding='utf-8') as f:
+            await f.write(json.dumps(settings, ensure_ascii=False, indent=2))
