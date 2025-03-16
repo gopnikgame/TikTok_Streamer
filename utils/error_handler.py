@@ -13,7 +13,9 @@ class ErrorHandler:
         return cls._instance
     
     def _initialize(self):
-        """Инициализация обработчика ошибок"""
+        """
+        Инициализация обработчика ошибок
+        """
         self.logger = Logger().get_logger('ErrorHandler')
         self.logger.info("Инициализация обработчика ошибок")
         
@@ -21,7 +23,9 @@ class ErrorHandler:
         sys.excepthook = self.handle_global_exception
     
     def handle_global_exception(self, exc_type, exc_value, exc_traceback):
-        """Обрабатывает необработанные исключения в приложении"""
+        """
+        Обрабатывает необработанные исключения в приложении
+        """
         try:
             error_msg = ''.join(traceback.format_exception(exc_type, exc_value, exc_traceback))
             self.logger.critical(f"Необработанное исключение: {error_msg}")
@@ -38,7 +42,9 @@ class ErrorHandler:
             self.logger.error(f"Ошибка при обработке глобального исключения: {str(e)}", exc_info=True)
     
     def handle_network_error(self, parent_widget, error, operation=None):
-        """Обрабатывает сетевые ошибки"""
+        """
+        Обрабатывает сетевые ошибки
+        """
         try:
             error_str = str(error)
             operation_str = f" при {operation}" if operation else ""
@@ -55,7 +61,9 @@ class ErrorHandler:
             return False
     
     def handle_tiktok_error(self, parent_widget, error):
-        """Обрабатывает ошибки API TikTok"""
+        """
+        Обрабатывает ошибки API TikTok
+        """
         try:
             error_str = str(error)
             self.logger.error(f"Ошибка API TikTok: {error_str}")
@@ -78,7 +86,9 @@ class ErrorHandler:
             return False
     
     def handle_file_error(self, parent_widget, error, file_path=None):
-        """Обрабатывает ошибки работы с файлами"""
+        """
+        Обрабатывает ошибки работы с файлами
+        """
         try:
             file_info = f" '{file_path}'" if file_path else ""
             error_str = str(error)
@@ -103,7 +113,9 @@ class ErrorHandler:
             return False
     
     def show_validation_error(self, parent_widget, message):
-        """Показывает сообщение об ошибке валидации данных"""
+        """
+        Показывает сообщение об ошибке валидации данных
+        """
         try:
             self.logger.warning(f"Ошибка валидации: {message}")
             
@@ -114,7 +126,9 @@ class ErrorHandler:
             return False
     
     def show_error_dialog(self, parent_widget, title, message, details=None):
-        """Показывает диалог с ошибкой и дополнительными деталями"""
+        """
+        Показывает диалог с ошибкой и дополнительными деталями
+        """
         try:
             self.logger.error(f"{title}: {message}")
             
