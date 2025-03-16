@@ -28,7 +28,7 @@ class GiftService:
         self.gift_dict = {}
         self.gift_file = "gifts.json"
         
-        # Загружаем данные из файла, если он существует
+        # Загружаем данные из файла при инициализации
         asyncio.run(self._load_from_file())
     
     async def _load_from_file(self):
@@ -61,7 +61,7 @@ class GiftService:
     
     def get(self, gift_id):
         """
-        Получает данные подарка по ID
+        Получает данные подарка по ID из кэша
         """
         try:
             gift_id_str = str(gift_id)
@@ -79,7 +79,7 @@ class GiftService:
     
     async def create(self, gift_id, name, url):
         """
-        Создает новую запись о подарке
+        Создает новую запись о подарке и обновляет кэш
         """
         try:
             self.logger.debug(f"Запуск создания данных подарка ID {gift_id}, имя: {name}, URL: {url}")
@@ -139,7 +139,7 @@ class GiftService:
     
     def delete(self, gift_id):
         """
-        Удаляет данные о подарке
+        Удаляет данные о подарке из кэша и файла
         """
         try:
             self.logger.debug(f"Запуск удаления данных подарка ID {gift_id}")
@@ -161,7 +161,7 @@ class GiftService:
     
     def get_all(self):
         """
-        Возвращает словарь со всеми данными о подарках
+        Возвращает словарь со всеми данными о подарках из кэша
         """
         try:
             self.logger.debug("Запуск получения всех данных о подарках")
@@ -181,7 +181,7 @@ class GiftService:
     
     def clear(self):
         """
-        Очищает все данные о подарках
+        Очищает все данные о подарках из кэша и файла
         """
         try:
             self.logger.debug("Запуск очистки данных о подарках")
