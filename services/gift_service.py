@@ -3,6 +3,7 @@ import json
 import base64
 import aiohttp
 import asyncio
+import aiofiles
 from utils.logger import Logger
 from utils.error_handler import ErrorHandler
 from models.data_models import GiftData
@@ -17,7 +18,9 @@ class GiftService:
         return cls._instance
     
     def _initialize(self):
-        """Инициализация сервиса подарков"""
+        """
+        Инициализация сервиса подарков
+        """
         self.logger = Logger().get_logger('GiftService')
         self.error_handler = ErrorHandler()
         self.logger.info("Инициализация сервиса подарков")
@@ -26,14 +29,16 @@ class GiftService:
         self.gift_file = "gifts.json"
         
         # Загружаем данные из файла, если он существует
-        self._load_from_file()
+        asyncio.run(self._load_from_file())
     
-    def _load_from_file(self):
-        """Загружает данные о подарках из файла"""
+    async def _load_from_file(self):
+        """
+        Загружает данные о подарках из файла
+        """
         try:
             if os.path.exists(self.gift_file):
-                with open(self.gift_file, 'r', encoding='utf-8') as f:
-                    self.gift_dict = json.load(f)
+                async with aiofiles.open(self.gift_file, 'r', encoding='utf-8') as f:
+                    self.gift_dict = json.loads(await f.read())
                 self.logger.info(f"Загружено {len(self.gift_dict)} записей о подарках из файла")
             else:
                 self.logger.debug(f"Файл {self.gift_file} не найден, инициализация пустого словаря")
@@ -42,18 +47,22 @@ class GiftService:
             self.error_handler.handle_file_error(None, e, self.gift_file)
             self.gift_dict = {}
     
-    def _save_to_file(self):
-        """Сохраняет данные о подарках в файл"""
+    async def _save_to_file(self):
+        """
+        Сохраняет данные о подарках в файл
+        """
         try:
-            with open(self.gift_file, 'w', encoding='utf-8') as f:
-                json.dump(self.gift_dict, f, ensure_ascii=False, indent=2)
+            async with aiofiles.open(self.gift_file, 'w', encoding='utf-8') as f:
+                await f.write(json.dumps(self.gift_dict, ensure_ascii=False, indent=2))
             self.logger.info(f"Сохранено {len(self.gift_dict)} записей о подарках в файл")
         except Exception as e:
             self.logger.error(f"Ошибка при сохранении данных о подарках: {str(e)}", exc_info=True)
             self.error_handler.handle_file_error(None, e, self.gift_file)
     
     def get(self, gift_id):
-        """Получает данные подарка по ID"""
+        """
+        Получает данные подарка по ID
+        """
         try:
             gift_id_str = str(gift_id)
             
@@ -69,7 +78,9 @@ class GiftService:
             return None
     
     async def create(self, gift_id, name, url):
-        """Создает новую запись о подарке"""
+        """
+        Создает новую запись о подарке
+        """
         try:
             self.logger.debug(f"Запуск создания данных подарка ID {gift_id}, имя: {name}, URL: {url}")
             # Используем aiohttp для асинхронного запроса
@@ -94,8 +105,7 @@ class GiftService:
                         self.logger.debug(f"Данные подарка ID {gift_id} добавлены в словарь: {gift_data}")
                         
                         # Сохраняем в файл асинхронно
-                        loop = asyncio.get_event_loop()
-                        await loop.run_in_executor(None, self._save_to_file)
+                        await self._save_to_file()
                         self.logger.info(f"Подарок ID {gift_id} успешно создан и сохранен")
                         
                         return GiftData(id=gift_id, name=name, image=image_data)
@@ -106,11 +116,13 @@ class GiftService:
         except Exception as e:
             self.logger.error(f"Ошибка при создании данных подарка: {str(e)}", exc_info=True)
             self.error_handler.show_error_dialog(None, "Ошибка обработки подарка", 
-                                              f"Не удалось создать данные для подарка ID {gift_id}", str(e))
+                                                 f"Не удалось создать данные для подарка ID {gift_id}", str(e))
             return None
     
     def create_sync(self, gift_id, name, url):
-        """Синхронный вариант метода create для использования из других потоков"""
+        """
+        Синхронный вариант метода create для использования из других потоков
+        """
         try:
             self.logger.debug(f"Запуск синхронного создания данных подарка ID {gift_id}, имя: {name}, URL: {url}")
             # Создаем временный event loop для выполнения асинхронного кода
@@ -122,18 +134,20 @@ class GiftService:
         except Exception as e:
             self.logger.error(f"Ошибка при синхронном создании данных подарка: {str(e)}", exc_info=True)
             self.error_handler.show_error_dialog(None, "Ошибка обработки подарка", 
-                                              f"Не удалось создать данные для подарка ID {gift_id}", str(e))
+                                                 f"Не удалось создать данные для подарка ID {gift_id}", str(e))
             return None
     
     def delete(self, gift_id):
-        """Удаляет данные о подарке"""
+        """
+        Удаляет данные о подарке
+        """
         try:
             self.logger.debug(f"Запуск удаления данных подарка ID {gift_id}")
             gift_id_str = str(gift_id)
             
             if gift_id_str in self.gift_dict:
                 del self.gift_dict[gift_id_str]
-                self._save_to_file()
+                asyncio.run(self._save_to_file())
                 self.logger.info(f"Данные подарка ID {gift_id} удалены")
                 return True
             
@@ -142,11 +156,13 @@ class GiftService:
         except Exception as e:
             self.logger.error(f"Ошибка при удалении данных подарка: {str(e)}", exc_info=True)
             self.error_handler.show_error_dialog(None, "Ошибка удаления", 
-                                              f"Не удалось удалить данные подарка ID {gift_id}", str(e))
+                                                 f"Не удалось удалить данные подарка ID {gift_id}", str(e))
             return False
     
     def get_all(self):
-        """Возвращает словарь со всеми данными о подарках"""
+        """
+        Возвращает словарь со всеми данными о подарках
+        """
         try:
             self.logger.debug("Запуск получения всех данных о подарках")
             result = {}
@@ -160,17 +176,19 @@ class GiftService:
         except Exception as e:
             self.logger.error(f"Ошибка при получении списка подарков: {str(e)}", exc_info=True)
             self.error_handler.show_error_dialog(None, "Ошибка получения данных", 
-                                              "Не удалось получить список всех подарков", str(e))
+                                                 "Не удалось получить список всех подарков", str(e))
             return {}
     
     def clear(self):
-        """Очищает все данные о подарках"""
+        """
+        Очищает все данные о подарках
+        """
         try:
             self.logger.debug("Запуск очистки данных о подарках")
             self.gift_dict = {}
-            self._save_to_file()
+            asyncio.run(self._save_to_file())
             self.logger.info("Данные о подарках очищены")
         except Exception as e:
             self.logger.error(f"Ошибка при очистке данных о подарках: {str(e)}", exc_info=True)
             self.error_handler.show_error_dialog(None, "Ошибка очистки данных", 
-                                              "Не удалось очистить данные о подарках", str(e))
+                                                 "Не удалось очистить данные о подарках", str(e))
