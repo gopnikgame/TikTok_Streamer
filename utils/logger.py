@@ -4,6 +4,8 @@ from logging.handlers import RotatingFileHandler
 import sys
 import locale
 import aiofiles
+import asyncio
+from utils.settings import Settings
 
 class Logger:
     _instance = None
@@ -35,11 +37,15 @@ class Logger:
             encoding='utf-8'
         )
         file_handler.setFormatter(formatter)
-        file_handler.setLevel(logging.DEBUG)
+        
+        # Получаем уровень логирования из настроек
+        settings = Settings()
+        logging_level = getattr(logging, settings.logging_level.upper(), logging.DEBUG)
+        file_handler.setLevel(logging_level)
         
         # Создаем и настраиваем корневой логгер
         root_logger = logging.getLogger('TTStreamerPy')
-        root_logger.setLevel(logging.DEBUG)
+        root_logger.setLevel(logging_level)
         
         # Удаляем все существующие обработчики перед добавлением новых
         for handler in root_logger.handlers[:]:
@@ -67,7 +73,7 @@ class Logger:
                 
             # Создаем консольный обработчик с явным указанием stdout
             console_handler = logging.StreamHandler(sys.stdout)
-            console_handler.setLevel(logging.INFO)
+            console_handler.setLevel(logging_level)
             console_handler.setFormatter(formatter)
             root_logger.addHandler(console_handler)
             
