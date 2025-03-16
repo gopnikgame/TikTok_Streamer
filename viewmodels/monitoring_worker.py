@@ -184,8 +184,9 @@ class MonitoringWorker(QObject):
                 self.logger.debug("Закрытие event loop")
                 try:
                     await self.loop.shutdown_asyncgens()
-                    self.loop.stop()  # Останавливаем event loop
                 except Exception as e:
-                    self.logger.error(f"Ошибка при закрытии event loop: {str(e)}")
-                    self.error_handler.show_error_dialog(None, "Ошибка", "Ошибка при закрытии event loop", str(e))
+                    self.logger.error(f"Ошибка при закрытии асинхронных генераторов: {str(e)}")
+                finally:
+                    self.loop.stop()  # Останавливаем event loop
+                    self.loop.close()
             self.logger.debug("Завершение метода _run_tiktok_client")
