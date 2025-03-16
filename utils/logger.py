@@ -33,6 +33,12 @@ class Logger:
         log_format = '%(asctime)s - %(name)s - %(levellevel)s - %(message)s'
         formatter = logging.Formatter(log_format)
         
+        # Получаем уровень логирования из настроек
+        settings = Settings()
+        await asyncio.sleep(0)  # Даем время для инициализации настроек
+        logging_level = getattr(logging, settings.logging_level.upper(), logging.DEBUG)
+        file_handler.setLevel(logging_level)
+        
         # Настраиваем логирование в файл с ротацией с явным указанием UTF-8
         file_handler = RotatingFileHandler(
             os.path.join(log_dir, "app.log"), 
@@ -41,11 +47,6 @@ class Logger:
             encoding='utf-8'
         )
         file_handler.setFormatter(formatter)
-        
-        # Получаем уровень логирования из настроек
-        settings = Settings()
-        logging_level = getattr(logging, settings.logging_level.upper(), logging.DEBUG)
-        file_handler.setLevel(logging_level)
         
         # Создаем и настраиваем корневой логгер
         root_logger = logging.getLogger('TTStreamerPy')
