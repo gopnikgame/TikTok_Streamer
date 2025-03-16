@@ -69,7 +69,7 @@ class MonitoringViewModel(QObject):
         if self._stream != value:
             self._stream = value
             self.settings.user_id = value
-            self.settings.save()
+            asyncio.run(self.settings.save())  # Использование asyncio.run
             self.logger.debug(f"ID стрима изменен: {value}")
 
     @property
@@ -81,7 +81,7 @@ class MonitoringViewModel(QObject):
         if self._notify_gift != value:
             self._notify_gift = value
             self.settings.notify_gift = value
-            self.settings.save()
+            asyncio.run(self.settings.save())  # Использование asyncio.run
             self.logger.debug(f"Настройка звуковых оповещений изменена: {value}")
 
     @property
@@ -93,7 +93,7 @@ class MonitoringViewModel(QObject):
         if self._speech_gift != value:
             self._speech_gift = value
             self.settings.speech_gift = value
-            self.settings.save()
+            asyncio.run(self.settings.save())  # Использование asyncio.run
             self.logger.debug(f"Настройка озвучивания подарков изменена: {value}")
 
     @property
@@ -105,7 +105,7 @@ class MonitoringViewModel(QObject):
         if self._speech_like != value:
             self._speech_like = value
             self.settings.speech_like = value
-            self.settings.save()
+            asyncio.run(self.settings.save())  # Использование asyncio.run
             self.logger.debug(f"Настройка озвучивания лайков изменена: {value}")
 
     @property
@@ -117,7 +117,7 @@ class MonitoringViewModel(QObject):
         if self._speech_member != value:
             self._speech_member = value
             self.settings.speech_member = value
-            self.settings.save()
+            asyncio.run(self.settings.save())  # Использование asyncio.run
             self.logger.debug(f"Настройка озвучивания подключений изменена: {value}")
 
     def add_item(self, item):
