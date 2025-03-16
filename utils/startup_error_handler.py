@@ -4,10 +4,12 @@ import platform
 import importlib.util
 import traceback
 import ctypes
-from typing import List, Dict, Optional
+from typing import List, Dict
 
 class StartupErrorHandler:
-    """Обработчик ошибок запуска приложения"""
+    """
+    Обработчик ошибок запуска приложения
+    """
     
     # Список необходимых библиотек/модулей для проверки
     REQUIRED_MODULES = [
@@ -43,7 +45,9 @@ class StartupErrorHandler:
     
     @staticmethod
     def check_imports() -> List[str]:
-        """Проверяет наличие всех необходимых импортов"""
+        """
+        Проверяет наличие всех необходимых импортов
+        """
         missing_modules = []
         
         for module_name in StartupErrorHandler.REQUIRED_MODULES:
@@ -54,7 +58,9 @@ class StartupErrorHandler:
     
     @staticmethod
     def check_dlls() -> List[str]:
-        """Проверяет наличие необходимых DLL на Windows"""
+        """
+        Проверяет наличие необходимых DLL на Windows
+        """
         missing_dlls = []
         
         # Проверяем DLL только на Windows
@@ -96,12 +102,16 @@ class StartupErrorHandler:
     
     @staticmethod
     def check_assets_folder() -> bool:
-        """Проверяет наличие папки assets"""
+        """
+        Проверяет наличие папки assets
+        """
         return os.path.exists("assets")
     
     @staticmethod
     def show_error_messagebox(title: str, message: str) -> None:
-        """Отображает окно с ошибкой в зависимости от ОС"""
+        """
+        Отображает окно с ошибкой в зависимости от ОС
+        """
         if platform.system() == "Windows":
             ctypes.windll.user32.MessageBoxW(0, message, title, 0x10)
         else:
@@ -110,7 +120,9 @@ class StartupErrorHandler:
     
     @staticmethod
     def get_solution_for_error(error_type: str) -> str:
-        """Возвращает рекомендацию по решению проблемы"""
+        """
+        Возвращает рекомендацию по решению проблемы
+        """
         return StartupErrorHandler.ERROR_SOLUTIONS.get(
             error_type, 
             "Проверьте правильность установки всех компонентов программы"
@@ -118,7 +130,9 @@ class StartupErrorHandler:
     
     @staticmethod
     def check_environment() -> Dict[str, List[str]]:
-        """Проверяет окружение на наличие всех необходимых компонентов"""
+        """
+        Проверяет окружение на наличие всех необходимых компонентов
+        """
         issues = {}
         
         # Проверяем модули
@@ -140,7 +154,9 @@ class StartupErrorHandler:
     
     @staticmethod
     def format_error_message(issues: Dict[str, List[str]]) -> str:
-        """Форматирует сообщение об ошибке на основе обнаруженных проблем"""
+        """
+        Форматирует сообщение об ошибке на основе обнаруженных проблем
+        """
         message = "При запуске программы возникли следующие проблемы:\n\n"
         
         if "missing_modules" in issues:
@@ -165,7 +181,9 @@ class StartupErrorHandler:
     
     @staticmethod
     def handle_startup_error(e: Exception) -> None:
-        """Обрабатывает ошибку запуска приложения"""
+        """
+        Обрабатывает ошибку запуска приложения
+        """
         error_message = f"Произошла критическая ошибка при запуске приложения:\n\n{str(e)}\n\n"
         
         # Проверяем типичные ошибки и добавляем решения
@@ -190,5 +208,5 @@ class StartupErrorHandler:
                 f.write(f"[{platform.system()} {platform.version()}]\n")
                 f.write(f"Python {sys.version}\n\n")
                 f.write(error_message)
-        except:
-            pass  # Игнорируем ошибки при записи лога
+        except Exception as log_error:
+            print(f"Ошибка записи лога: {log_error}")
