@@ -232,6 +232,7 @@ pygame>=2.6.1
 TikTokLive==6.4.4
 aiohttp>=3.11.13
 requests>=2.32.3
+aiofiles>=24.1.0
 EOF
     print_message "$GREEN" "[+]" "Файл requirements.txt создан."
 fi

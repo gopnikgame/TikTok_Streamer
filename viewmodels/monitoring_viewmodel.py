@@ -1,3 +1,4 @@
+# viewmodels/monitoring_viewmodel.py
 import os
 import threading
 import asyncio
@@ -31,6 +32,7 @@ class MonitoringViewModel(QObject):
         self._speech_gift = self.settings.speech_gift
         self._speech_like = self.settings.speech_like
         self._speech_member = self.settings.speech_member
+        self._speech_volume = self.settings.speech_volume  # Добавлено свойство для громкости речи
         # Список событий для отображения
         self.item_list = []
         # Клиент TikTok
@@ -68,6 +70,8 @@ class MonitoringViewModel(QObject):
     def stream(self, value):
         if self._stream != value:
             self._stream = value
+            if value not in self.settings.saved_user_ids:
+                self.settings.saved_user_ids.append(value)
             self.settings.user_id = value
             asyncio.run(self.settings.save())  # Использование asyncio.run
             self.logger.debug(f"ID стрима изменен: {value}")
@@ -119,6 +123,18 @@ class MonitoringViewModel(QObject):
             self.settings.speech_member = value
             asyncio.run(self.settings.save())  # Использование asyncio.run
             self.logger.debug(f"Настройка озвучивания подключений изменена: {value}")
+
+    @property
+    def speech_volume(self):
+        return self._speech_volume
+
+    @speech_volume.setter
+    def speech_volume(self, value):
+        if self._speech_volume != value:
+            self._speech_volume = value
+            self.settings.speech_volume = value
+            asyncio.run(self.settings.save())  # Использование asyncio.run
+            self.logger.debug(f"Настройка громкости речи изменена: {value}")
 
     def add_item(self, item):
         """Добавляет новое событие в список"""

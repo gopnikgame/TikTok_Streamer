@@ -1,3 +1,4 @@
+# utils/settings.py
 import json
 import os
 import aiofiles
@@ -32,10 +33,12 @@ class Settings:
         self.speech_member = settings.get("speech_member", False)
         self.speech_voice = settings.get("speech_voice", "")
         self.speech_rate = settings.get("speech_rate", 4)
+        self.speech_volume = settings.get("speech_volume", 1.0)  # Добавлен параметр для громкости речи
         self.notify_delay = settings.get("notify_delay", 500)
         self.join_text = settings.get("join_text", "@name подключился к стриму")
         self.like_text = settings.get("like_text", "@name поставил лайк")
         self.logging_level = settings.get("logging_level", "DEBUG")  # Добавлен параметр уровня логирования
+        self.saved_user_ids = settings.get("saved_user_ids", [])  # Добавлен параметр для сохраненных ID стримов
     
     async def save(self):
         settings = {
@@ -46,10 +49,12 @@ class Settings:
             "speech_member": self.speech_member,
             "speech_voice": self.speech_voice,
             "speech_rate": self.speech_rate,
+            "speech_volume": self.speech_volume,  # Добавлен параметр для громкости речи
             "notify_delay": self.notify_delay,
             "join_text": self.join_text,
             "like_text": self.like_text,
-            "logging_level": self.logging_level
+            "logging_level": self.logging_level,
+            "saved_user_ids": self.saved_user_ids
         }
         
         async with aiofiles.open(self.settings_file, 'w', encoding='utf-8') as f:
