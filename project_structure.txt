@@ -1,18 +1,20 @@
 TikTok_Streamer/
-├── app.py              # Точка входа в приложение
-├── requirements.txt    # Зависимости проекта
-├── assets/             # Папка для звуков и изображений
-├── services/           # Сервисные классы
-│   ├── speech_service.py  # Сервис синтеза речи
-│   ├── sound_service.py   # Сервис звуковых уведомлений
-│   └── gift_service.py    # Сервис работы с подарками
-├── models/             # Модели данных
-│   └── data_models.py     # Определения классов данных
-├── viewmodels/         # Связующее звено между GUI и сервисами
-│   └── monitoring_viewmodel.py  # ViewModel для мониторинга
-├── views/              # Классы представлений (GUI)
-│   └── main_window.py     # Главное окно приложения
-└── utils/              # Вспомогательные утилиты
-    ├── error_handler.py   # Обработка ошибок
-    ├── logger.py          # Система логирования
-    └── settings.py        # Работа с настройками
+├── app.py                      # Точка входа в приложение
+├── requirements.txt            # Зависимости проекта
+├── assets/                     # Папка для звуков и изображений
+├── services/                   # Сервисные классы
+│   ├── speech_service.py          # Сервис синтеза речи
+│   ├── sound_service.py           # Сервис звуковых уведомлений
+│   └── gift_service.py            # Сервис работы с подарками
+├── models/                     # Модели данных
+│   └── data_models.py             # Определения классов данных
+├── viewmodels/                 # Связующее звено между GUI и сервисами
+│   ├── monitoring_worker.py       # 
+│   └── monitoring_viewmodel.py    # ViewModel для мониторинга
+├── views/                      # Классы представлений (GUI)
+│   └── main_window.py             # Главное окно приложения
+└── utils/                      # Вспомогательные утилиты
+    ├── error_handler.py           # Обработка ошибок
+    ├── startup_error_handler.py   # Обработка ошибок при старте
+    ├── logger.py                  # Система логирования
+    └── settings.py                # Работа с настройками
