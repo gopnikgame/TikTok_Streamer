@@ -6,6 +6,7 @@ from utils.settings import Settings
 from utils.logger import Logger
 from utils.error_handler import ErrorHandler
 from PyQt6.QtCore import QObject, pyqtSignal
+from datetime import datetime
 
 class MonitoringWorker(QObject):
     status_changed = pyqtSignal(str)
@@ -80,6 +81,7 @@ class MonitoringWorker(QObject):
             async def on_gift(event: GiftEvent):
                 self.logger.info(f"Получен подарок {event.gift.name} от {event.user.nickname}")
                 try:
+                    tasks = []
                     if event.gift.streakable:
                         if not event.streaking:
                             item = TableItemView(
@@ -91,14 +93,14 @@ class MonitoringWorker(QObject):
                             self.item_added.emit(item)
                             if self.settings.speech_gift:
                                 self.logger.debug(f"Озвучивание подарка от {event.user.nickname}")
-                                self.speech_service.speech(
+                                tasks.append(self.speech_service.speech(
                                     f"{event.user.nickname} прислал {event.gift.name} {event.repeat_count} раз",
                                     self.settings.speech_voice,
                                     self.settings.speech_rate
-                                )
+                                ))
                             if self.settings.notify_gift:
                                 self.logger.debug(f"Воспроизведение звука для подарка ID {event.gift.id}")
-                                self.sound_service.play(event.gift.id, self.settings.notify_delay)
+                                tasks.append(self.sound_service.play(event.gift.id, self.settings.notify_delay))
                     else:
                         item = TableItemView(
                             timestamp=datetime.now(),
@@ -109,14 +111,15 @@ class MonitoringWorker(QObject):
                         self.item_added.emit(item)
                         if self.settings.speech_gift:
                             self.logger.debug(f"Озвучивание подарка от {event.user.nickname}")
-                            self.speech_service.speech(
+                            tasks.append(self.speech_service.speech(
                                 f"{event.user.nickname} прислал {event.gift.name}",
                                 self.settings.speech_voice,
                                 self.settings.speech_rate
-                            )
+                            ))
                         if self.settings.notify_gift:
                             self.logger.debug(f"Воспроизведение звука для подарка ID {event.gift.id}")
-                            self.sound_service.play(event.gift.id, self.settings.notify_delay)
+                            tasks.append(self.sound_service.play(event.gift.id, self.settings.notify_delay))
+                    await asyncio.gather(*tasks)
                 except Exception as e:
                     self.logger.error(f"Ошибка при обработке подарка: {str(e)}", exc_info=True)
 
@@ -134,7 +137,7 @@ class MonitoringWorker(QObject):
                     if self.settings.speech_like:
                         like_text = self.settings.like_text.replace("@name", event.user.nickname)
                         self.logger.debug(f"Озвучивание лайка: {like_text}")
-                        self.speech_service.speech(
+                        await self.speech_service.speech(
                             like_text,
                             self.settings.speech_voice,
                             self.settings.speech_rate
@@ -156,7 +159,7 @@ class MonitoringWorker(QObject):
                     if self.settings.speech_member:
                         join_text = self.settings.join_text.replace("@name", event.user.nickname)
                         self.logger.debug(f"Озвучивание подключения: {join_text}")
-                        self.speech_service.speech(
+                        await self.speech_service.speech(
                             join_text,
                             self.settings.speech_voice,
                             self.settings.speech_rate
