@@ -13,7 +13,11 @@ class Logger:
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super(Logger, cls).__new__(cls)
-            asyncio.run(cls._instance._initialize_logger())
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                loop.create_task(cls._instance._initialize_logger())
+            else:
+                asyncio.run(cls._instance._initialize_logger())
         return cls._instance
     
     async def _initialize_logger(self):
@@ -26,7 +30,7 @@ class Logger:
             os.makedirs(log_dir)
         
         # Настраиваем форматирование логов
-        log_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        log_format = '%(asctime)s - %(name)s - %(levellevel)s - %(message)s'
         formatter = logging.Formatter(log_format)
         
         # Настраиваем логирование в файл с ротацией с явным указанием UTF-8
