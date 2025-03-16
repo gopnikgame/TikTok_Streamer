@@ -54,8 +54,12 @@ except ImportError:
     show_error("Критическая ошибка", "Не удалось запустить приложение. Проверьте наличие всех файлов программы.")
     sys.exit(1)
 
+# Объявляем logger в глобальной области
+from utils.logger import Logger
+logger = None
+
 def main():
-    logger = None  # Инициализация logger
+    global logger  # Используем глобальную переменную logger
     try:
         logger = Logger().get_logger()
         logger.info("Запуск приложения TTStreamerPy")
@@ -89,7 +93,6 @@ def main():
         from services.gift_service import GiftService
         from viewmodels.monitoring_viewmodel import MonitoringViewModel
         from views.main_window import MainWindow
-        from utils.logger import Logger
         from utils.error_handler import ErrorHandler
         
         error_handler = ErrorHandler()
@@ -110,8 +113,8 @@ def main():
             logger.debug("Создано приложение QApplication")
         except Exception as e:
             error_handler.show_error_dialog(None, "Критическая ошибка", 
-                                            "Не удалось создать приложение", 
-                                            str(e))
+                                         "Не удалось создать приложение", 
+                                         str(e))
             logger.critical(f"Критическая ошибка при создании QApplication: {str(e)}", exc_info=True)
             sys.exit(1)
         
@@ -132,8 +135,8 @@ def main():
             sys.exit(app.exec())
         except Exception as e:
             error_handler.show_error_dialog(None, "Критическая ошибка", 
-                                            "Не удалось запустить приложение", 
-                                            str(e))
+                                         "Не удалось запустить приложение", 
+                                         str(e))
             logger.critical(f"Критическая ошибка при запуске: {str(e)}", exc_info=True)
             sys.exit(1)
     except Exception as e:
