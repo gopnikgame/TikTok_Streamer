@@ -156,18 +156,48 @@ class MonitoringViewModel(QObject):
 
     def stop_monitoring(self):
         """Останавливает мониторинг стрима"""
-        if self.worker and self.thread.isRunning():
+        if self.worker and self.thread and self.thread.isRunning():
+            self.logger.info("Остановка мониторинга стрима")
+            
+            # Этап 1: Безопасное отключение через request_shutdown
             try:
-                self.logger.info("Остановка мониторинга стрима")
-                if self.worker.client_task:
-                    self.worker.client_task.cancel()
-                    self.logger.debug("Задача клиента отменена")
-                asyncio.run_coroutine_threadsafe(self.worker.client.disconnect(), self.worker.loop)
+                if self.worker.loop and self.worker.client:
+                    # Используем метод request_shutdown и ждем результат с таймаутом
+                    future = asyncio.run_coroutine_threadsafe(
+                        self.worker.request_shutdown(), 
+                        self.worker.loop
+                    )
+                    try:
+                        # Ждем результат с таймаутом 3 секунды
+                        shutdown_complete = future.result(timeout=3.0)
+                        if shutdown_complete:
+                            self.logger.debug("Запрос на завершение работы выполнен успешно")
+                    except (asyncio.TimeoutError, Exception) as e:
+                        self.logger.warning(f"Таймаут или ошибка при выполнении request_shutdown: {str(e)}")
             except Exception as e:
                 self.logger.error(f"Ошибка при остановке клиента: {str(e)}")
                 self.error_handler.handle_tiktok_error(None, e)
+                
+            # Этап 2: Корректное завершение потока
+            try:
+                # Сначала пробуем gracefully
+                self.thread.quit()
+                
+                # Ждем завершения потока с таймаутом
+                if not self.thread.wait(3000):  # 3 секунды
+                    self.logger.warning("Поток не завершился вовремя, принудительное завершение")
+                    self.thread.terminate()  # Принудительное завершение
+                    
+                    # Подождем еще немного для очистки ресурсов
+                    if not self.thread.wait(1000):
+                        self.logger.error("Не удалось принудительно завершить поток!")
+            except Exception as e:
+                self.logger.error(f"Ошибка при завершении потока: {str(e)}")
+        
+        # Обновляем состояние независимо от успеха остановки
         self.is_monitoring = False
         self.is_processing = False
+        self.status_changed.emit("Мониторинг остановлен")
         self.logger.info("Мониторинг остановлен")
 
     def on_status_changed(self, status):
