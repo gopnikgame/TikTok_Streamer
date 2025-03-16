@@ -43,8 +43,7 @@ class Logger:
         file_handler.setFormatter(formatter)
         
         # Получаем уровень логирования из настроек
-        settings = Settings()
-        await asyncio.sleep(0)  # Даем время для инициализации настроек
+        settings = await self._get_settings()
         logging_level = getattr(logging, settings.logging_level.upper(), logging.DEBUG)
         file_handler.setLevel(logging_level)
         
@@ -98,6 +97,15 @@ class Logger:
         
         # Логируем завершение инициализации
         root_logger.info("Логгер инициализирован успешно")
+
+    async def _get_settings(self):
+        """
+        Получает настройки с ожиданием их инициализации
+        """
+        settings = Settings()
+        while not hasattr(settings, 'logging_level'):
+            await asyncio.sleep(0.1)
+        return settings
     
     async def _log_system_info(self):
         """
