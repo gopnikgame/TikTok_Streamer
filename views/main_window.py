@@ -1,9 +1,14 @@
-from PyQt6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableView, \
-    QTabWidget, QLineEdit, QLabel, QCheckBox, QComboBox, QSlider, QSpinBox, QListView, QAbstractItemView, QMessageBox, QFileDialog
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QStandardItemModel, QStandardItem
+import os
+import threading
+from PyQt6.QtWidgets import (
+    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableView, 
+    QTabWidget, QLineEdit, QLabel, QCheckBox, QComboBox, QSlider, QSpinBox,
+    QListView, QAbstractItemView, QMessageBox, QFileDialog
+)
+from PyQt6.QtCore import Qt, QAbstractTableModel, QModelIndex
+from PyQt6.QtGui import QStandardItemModel, QStandardItem, QPixmap, QImage
 from PyQt6 import sip
-from models.data_models import AlertLevel
+from models.data_models import AlertLevel, TableItemView, GiftData
 from utils.error_handler import ErrorHandler
 from utils.logger import Logger
 from services.gift_service import GiftService
@@ -12,6 +17,67 @@ from services.sound_service import SoundService
 from utils.settings import Settings
 from viewmodels.monitoring_viewmodel import MonitoringViewModel
 from PyQt6.QtCore import QByteArray
+from datetime import datetime
+
+class EventsTableModel(QAbstractTableModel):
+    def __init__(self, viewmodel):
+        super().__init__()
+        self.viewmodel = viewmodel
+        self.headers = ["Время", "Пользователь", "Событие", "Уровень важности", "Подарок"]
+        self.logger = Logger().get_logger('EventsTableModel')
+        self.logger.info("Инициализация модели таблицы событий")
+
+    def rowCount(self, parent=QModelIndex()):
+        self.logger.debug(f"Запрос количества строк: {len(self.viewmodel.item_list)}")
+        return len(self.viewmodel.item_list)
+
+    def columnCount(self, parent=QModelIndex()):
+        self.logger.debug(f"Запрос количества столбцов: {len(self.headers)}")
+        return len(self.headers)
+
+    def data(self, index, role=Qt.ItemDataRole.DisplayRole):
+        if not index.isValid() or not (0 <= index.row() < len(self.viewmodel.item_list)):
+            self.logger.debug(f"Неверный индекс: {index}")
+            return None
+        item = self.viewmodel.item_list[index.row()]
+        if role == Qt.ItemDataRole.DisplayRole:
+            if index.column() == 0:
+                self.logger.debug(f"Запрос данных для строки {index.row()}, столбца {index.column()}: {item.timestamp.strftime('%H:%M:%S')}")
+                return item.timestamp.strftime("%H:%M:%S")
+            elif index.column() == 1:
+                self.logger.debug(f"Запрос данных для строки {index.row()}, столбца {index.column()}: {item.name}")
+                return item.name
+            elif index.column() == 2:
+                self.logger.debug(f"Запрос данных для строки {index.row()}, столбца {index.column()}: {item.event}")
+                return item.event
+            elif index.column() == 3:
+                self.logger.debug(f"Запрос данных для строки {index.row()}, столбца {index.column()}: {item.alert_level.name}")
+                return item.alert_level.name
+            elif index.column() == 4:
+                self.logger.debug(f"Запрос данных для строки {index.row()}, столбца {index.column()}: {item.gift_name}")
+                return item.gift_name
+        elif role == Qt.ItemDataRole.DecorationRole:
+            if index.column() == 4:
+                if item.gift_image:
+                    pixmap = self.base64_to_pixmap(item.gift_image)
+                    return pixmap.scaled(50, 50, Qt.AspectRatioMode.KeepAspectRatio)
+        elif role == Qt.ItemDataRole.BackgroundRole:
+            if item.alert_level == AlertLevel.IMPORTANT:
+                self.logger.debug(f"Запрос фона для строки {index.row()} с уровнем важности: {item.alert_level}")
+                return Qt.GlobalColor.yellow
+        return None
+
+    def headerData(self, section, orientation, role):
+        if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole:
+            self.logger.debug(f"Запрос заголовка для секции {section}: {self.headers[section]}")
+            return self.headers[section]
+        return None
+
+    def base64_to_pixmap(self, base64_string):
+        image_data = QByteArray.fromBase64(base64_string.encode('utf-8'))
+        image = QImage()
+        image.loadFromData(image_data)
+        return QPixmap.fromImage(image)
 
 class MainWindow(QMainWindow):
     def __init__(self, viewmodel):
@@ -43,8 +109,8 @@ class MainWindow(QMainWindow):
             self.logger.debug("Интерфейс инициализирован")
         except Exception as e:
             self.logger.error(f"Ошибка инициализации интерфейса: {str(e)}", exc_info=True)
-            self.error_handler.show_error_dialog(self, "Ошибка инициализации интерфейса",
-                                                 "Не удалось инициализировать пользовательский интерфейс", str(e))
+            self.error_handler.show_error_dialog(self, "Ошибка инициализации интерфейса", 
+                                              "Не удалось инициализировать пользовательский интерфейс", str(e))
 
     def create_monitoring_tab(self):
         """Создает вкладку мониторинга"""
@@ -98,8 +164,8 @@ class MainWindow(QMainWindow):
             return tab
         except Exception as e:
             self.logger.error(f"Ошибка при создании вкладки мониторинга: {str(e)}", exc_info=True)
-            self.error_handler.show_error_dialog(self, "Ошибка создания интерфейса",
-                                                 "Не удалось создать вкладку мониторинга", str(e))
+            self.error_handler.show_error_dialog(self, "Ошибка создания интерфейса", 
+                                              "Не удалось создать вкладку мониторинга", str(e))
             # В случае ошибки возвращаем пустой виджет
             return QWidget()
 
@@ -115,7 +181,7 @@ class MainWindow(QMainWindow):
             try:
                 # Получаем список доступных голосов
                 voices = self.viewmodel.speech_service.get_voices()
-                self.voice_combo.addItem("")  # Пустой вариант для значения по умолчанию
+                self.voice_combo.addItem("") # Пустой вариант для значения по умолчанию
                 self.voice_combo.addItems(voices)
                 # Устанавливаем текущий голос, если он задан
                 current_voice = self.viewmodel.settings.speech_voice
@@ -172,8 +238,8 @@ class MainWindow(QMainWindow):
             return tab
         except Exception as e:
             self.logger.error(f"Ошибка при создании вкладки настроек: {str(e)}", exc_info=True)
-            self.error_handler.show_error_dialog(self, "Ошибка создания интерфейса",
-                                                 "Не удалось создать вкладку настроек", str(e))
+            self.error_handler.show_error_dialog(self, "Ошибка создания интерфейса", 
+                                              "Не удалось создать вкладку настроек", str(e))
             # В случае ошибки возвращаем пустой виджет
             return QWidget()
 
@@ -229,8 +295,8 @@ class MainWindow(QMainWindow):
             return tab
         except Exception as e:
             self.logger.error(f"Ошибка при создании вкладки звуков: {str(e)}", exc_info=True)
-            self.error_handler.show_error_dialog(self, "Ошибка создания интерфейса",
-                                                 "Не удалось создать вкладку звуков", str(e))
+            self.error_handler.show_error_dialog(self, "Ошибка создания интерфейса", 
+                                              "Не удалось создать вкладку звуков", str(e))
             # В случае ошибки возвращаем пустой виджет
             return QWidget()
 
@@ -242,8 +308,8 @@ class MainWindow(QMainWindow):
             self.logger.debug("Обработчики событий привязаны")
         except Exception as e:
             self.logger.error(f"Ошибка при привязке обработчиков событий: {str(e)}", exc_info=True)
-            self.error_handler.show_error_dialog(self, "Ошибка инициализации",
-                                                 "Не удалось привязать обработчики событий", str(e))
+            self.error_handler.show_error_dialog(self, "Ошибка инициализации", 
+                                             "Не удалось привязать обработчики событий", str(e))
 
     def update_monitoring_state(self):
         """Обновляет состояние интерфейса в зависимости от статуса мониторинга"""
@@ -267,8 +333,8 @@ class MainWindow(QMainWindow):
                 self.logger.debug("Обновлено состояние: Готов к мониторингу")
         except Exception as e:
             self.logger.error(f"Ошибка при обновлении состояния мониторинга: {str(e)}", exc_info=True)
-            self.error_handler.show_error_dialog(self, "Ошибка обновления интерфейса",
-                                                 "Не удалось обновить состояние интерфейса", str(e))
+            self.error_handler.show_error_dialog(self, "Ошибка обновления интерфейса", 
+                                             "Не удалось обновить состояние интерфейса", str(e))
 
     def update_events_table(self):
         """Обновляет таблицу событий"""
@@ -306,8 +372,8 @@ class MainWindow(QMainWindow):
             self.viewmodel.start_monitoring()
         except Exception as e:
             self.logger.error(f"Ошибка при переключении мониторинга: {str(e)}", exc_info=True)
-            self.error_handler.show_error_dialog(self, "Ошибка мониторинга",
-                                                 "Не удалось изменить состояние мониторинга", str(e))
+            self.error_handler.show_error_dialog(self, "Ошибка мониторинга", 
+                                             "Не удалось изменить состояние мониторинга", str(e))
 
     def toggle_notify_gift(self):
         """Включает или выключает звуковые оповещения о подарках"""
@@ -316,8 +382,8 @@ class MainWindow(QMainWindow):
             self.logger.debug(f"Настройка звуковых оповещений изменена: {self.viewmodel.notify_gift}")
         except Exception as e:
             self.logger.error(f"Ошибка при изменении настройки звуковых оповещений: {str(e)}", exc_info=True)
-            self.error_handler.show_error_dialog(self, "Ошибка настроек",
-                                                 "Не удалось изменить настройку звуковых оповещений", str(e))
+            self.error_handler.show_error_dialog(self, "Ошибка настроек", 
+                                             "Не удалось изменить настройку звуковых оповещений", str(e))
 
     def toggle_speech_gift(self):
         """Включает или выключает озвучивание подарков"""
@@ -326,8 +392,8 @@ class MainWindow(QMainWindow):
             self.logger.debug(f"Настройка озвучивания подарков изменена: {self.viewmodel.speech_gift}")
         except Exception as e:
             self.logger.error(f"Ошибка при изменении настройки озвучивания подарков: {str(e)}", exc_info=True)
-            self.error_handler.show_error_dialog(self, "Ошибка настроек",
-                                                 "Не удалось изменить настройку озвучивания подарков", str(e))
+            self.error_handler.show_error_dialog(self, "Ошибка настроек", 
+                                             "Не удалось изменить настройку озвучивания подарков", str(e))
 
     def toggle_speech_like(self):
         """Включает или выключает озвучивание лайков"""
@@ -336,8 +402,8 @@ class MainWindow(QMainWindow):
             self.logger.debug(f"Настройка озвучивания лайков изменена: {self.viewmodel.speech_like}")
         except Exception as e:
             self.logger.error(f"Ошибка при изменении настройки озвучивания лайков: {str(e)}", exc_info=True)
-            self.error_handler.show_error_dialog(self, "Ошибка настроек",
-                                                 "Не удалось изменить настройку озвучивания лайков", str(e))
+            self.error_handler.show_error_dialog(self, "Ошибка настроек", 
+                                             "Не удалось изменить настройку озвучивания лайков", str(e))
 
     def toggle_speech_member(self):
         """Включает или выключает озвучивание подключений"""
@@ -346,8 +412,8 @@ class MainWindow(QMainWindow):
             self.logger.debug(f"Настройка озвучивания подключений изменена: {self.viewmodel.speech_member}")
         except Exception as e:
             self.logger.error(f"Ошибка при изменении настройки озвучивания подключений: {str(e)}", exc_info=True)
-            self.error_handler.show_error_dialog(self, "Ошибка настроек",
-                                                 "Не удалось изменить настройку озвучивания подключений", str(e))
+            self.error_handler.show_error_dialog(self, "Ошибка настроек", 
+                                             "Не удалось изменить настройку озвучивания подключений", str(e))
 
     def save_settings(self):
         """Сохраняет настройки"""
@@ -376,8 +442,8 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, "Настройки", "Настройки успешно сохранены")
         except Exception as e:
             self.logger.error(f"Ошибка при сохранении настроек: {str(e)}", exc_info=True)
-            self.error_handler.show_error_dialog(self, "Ошибка сохранения настроек",
-                                                 "Не удалось сохранить настройки", str(e))
+            self.error_handler.show_error_dialog(self, "Ошибка сохранения настроек", 
+                                             "Не удалось сохранить настройки", str(e))
 
     def update_sounds_list(self):
         """Обновляет список доступных звуков"""
@@ -410,8 +476,8 @@ class MainWindow(QMainWindow):
             self.logger.debug(f"Обновлен список привязок: {len(mappings)} привязок")
         except Exception as e:
             self.logger.error(f"Ошибка при обновлении списка привязок: {str(e)}", exc_info=True)
-            self.error_handler.show_error_dialog(self, "Ошибка обновления списка",
-                                                 "Не удалось обновить список привязок", str(e))
+            self.error_handler.show_error_dialog(self, "Ошибка обновления списка", 
+                                             "Не удалось обновить список привязок", str(e))
 
     def upload_sound(self):
         """Загружает новый звуковой файл"""
@@ -440,8 +506,8 @@ class MainWindow(QMainWindow):
                 self.error_handler.handle_file_error(self, e, destination)
         except Exception as e:
             self.logger.error(f"Ошибка при загрузке звука: {str(e)}", exc_info=True)
-            self.error_handler.show_error_dialog(self, "Ошибка загрузки звука",
-                                                 "Не удалось загрузить звуковой файл", str(e))
+            self.error_handler.show_error_dialog(self, "Ошибка загрузки звука", 
+                                             "Не удалось загрузить звуковой файл", str(e))
 
     def add_sound_mapping(self):
         """Добавляет новую привязку звука к ID подарка"""
@@ -457,14 +523,14 @@ class MainWindow(QMainWindow):
             # Обновляем список привязок
             self.update_mappings_list()
             QMessageBox.information(
-                self,
-                "Привязка звука",
+                self, 
+                "Привязка звука", 
                 f"Подарок с ID {gift_id} теперь будет сопровождаться звуком {sound_file}"
             )
         except Exception as e:
             self.logger.error(f"Ошибка при добавлении привязки звука: {str(e)}", exc_info=True)
-            self.error_handler.show_error_dialog(self, "Ошибка привязки звука",
-                                                 "Не удалось привязать звук к ID подарка", str(e))
+            self.error_handler.show_error_dialog(self, "Ошибка привязки звука", 
+                                             "Не удалось привязать звук к ID подарка", str(e))
 
     def closeEvent(self, event):
         """Обработчик события закрытия окна"""
