@@ -55,6 +55,25 @@ except ImportError:
     sys.exit(1)
 
 def main():
+    logger = None  # Инициализация logger
+    try:
+        logger = Logger().get_logger()
+        logger.info("Запуск приложения TTStreamerPy")
+    except Exception as e:
+        print(f"Ошибка при инициализации логгера: {str(e)}")
+        try:
+            import ctypes
+            ctypes.windll.user32.MessageBoxW(0, str(e), "Ошибка инициализации логгера", 0x10)
+        except:
+            pass
+        try:
+            with open("startup_error.log", "w", encoding="utf-8") as f:
+                f.write(f"Критическая ошибка при инициализации логгера:\n")
+                f.write(traceback.format_exc())
+        except:
+            pass
+        sys.exit(1)
+
     issues = StartupErrorHandler.check_environment()
     if issues:
         error_message = StartupErrorHandler.format_error_message(issues)
@@ -72,9 +91,6 @@ def main():
         from views.main_window import MainWindow
         from utils.logger import Logger
         from utils.error_handler import ErrorHandler
-        
-        logger = Logger().get_logger()
-        logger.info("Запуск приложения TTStreamerPy")
         
         error_handler = ErrorHandler()
         
@@ -121,14 +137,20 @@ def main():
             logger.critical(f"Критическая ошибка при запуске: {str(e)}", exc_info=True)
             sys.exit(1)
     except Exception as e:
+        if logger:
+            logger.critical(f"Критическая ошибка на этапе импорта: {str(e)}", exc_info=True)
+        else:
+            print(f"Критическая ошибка на этапе импорта: {str(e)}")
         StartupErrorHandler.handle_startup_error(e)
-        logger.critical(f"Критическая ошибка на этапе импорта: {str(e)}", exc_info=True)
         sys.exit(1)
 
 if __name__ == "__main__":
     try:
         main()
     except Exception as e:
+        if logger:
+            logger.critical(f"Критическая ошибка самого верхнего уровня: {str(e)}", exc_info=True)
+        else:
+            print(f"Критическая ошибка самого верхнего уровня: {str(e)}")
         StartupErrorHandler.handle_startup_error(e)
-        logger.critical(f"Критическая ошибка самого верхнего уровня: {str(e)}", exc_info=True)
         sys.exit(1)
