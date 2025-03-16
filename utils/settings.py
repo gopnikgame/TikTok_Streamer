@@ -9,7 +9,11 @@ class Settings:
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super(Settings, cls).__new__(cls)
-            asyncio.run(cls._instance._load_settings())
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                loop.create_task(cls._instance._load_settings())
+            else:
+                asyncio.run(cls._instance._load_settings())
         return cls._instance
     
     async def _load_settings(self):
