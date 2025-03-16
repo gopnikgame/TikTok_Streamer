@@ -8,6 +8,7 @@ from utils.error_handler import ErrorHandler
 from PyQt6.QtCore import QObject, pyqtSignal
 from datetime import datetime
 
+
 class MonitoringWorker(QObject):
     status_changed = pyqtSignal(str)
     item_added = pyqtSignal(TableItemView)
@@ -34,6 +35,8 @@ class MonitoringWorker(QObject):
         asyncio.set_event_loop(loop)
         try:
             loop.run_until_complete(self._run_tiktok_client())
+        except asyncio.CancelledError:
+            self.logger.debug("Работа была отменена")
         finally:
             loop.close()
 
@@ -159,6 +162,8 @@ class MonitoringWorker(QObject):
             self.client_task = self.loop.create_task(self.client.start())
             while not self.client_task.done() and not self.client_task.cancelled():
                 await asyncio.sleep(5)
+        except asyncio.CancelledError:
+            self.logger.debug("Асинхронная задача была отменена")
         except Exception as e:
             self.logger.error(f"Ошибка при подключении к TikTok: {str(e)}", exc_info=True)
             item = TableItemView(
@@ -188,5 +193,7 @@ class MonitoringWorker(QObject):
                     self.logger.error(f"Ошибка при закрытии асинхронных генераторов: {str(e)}")
                 finally:
                     self.loop.stop()  # Останавливаем event loop
+                    self.logger.debug("Event loop остановлен")
                     self.loop.close()
+                    self.logger.debug("Event loop закрыт")
             self.logger.debug("Завершение метода _run_tiktok_client")
