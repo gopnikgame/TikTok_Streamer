@@ -6,7 +6,7 @@ from models.data_models import TableItemView, AlertLevel
 from utils.settings import Settings
 from utils.logger import Logger
 from utils.error_handler import ErrorHandler
-from monitoring_worker import MonitoringWorker
+from viewmodels.monitoring_worker import MonitoringWorker
 from datetime import datetime
 from services.gift_service import GiftService
 
