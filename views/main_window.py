@@ -373,7 +373,7 @@ class MainWindow(QMainWindow):
         except Exception as e:
             self.logger.error(f"Ошибка при переключении мониторинга: {str(e)}", exc_info=True)
             self.error_handler.show_error_dialog(self, "Ошибка мониторинга", 
-                                             "Не удалось изменить состояние мониторинга", str(e))
+                                                 "Не удалось изменить состояние мониторинга", str(e))
 
     def toggle_notify_gift(self):
         """Включает или выключает звуковые оповещения о подарках"""
@@ -383,7 +383,7 @@ class MainWindow(QMainWindow):
         except Exception as e:
             self.logger.error(f"Ошибка при изменении настройки звуковых оповещений: {str(e)}", exc_info=True)
             self.error_handler.show_error_dialog(self, "Ошибка настроек", 
-                                             "Не удалось изменить настройку звуковых оповещений", str(e))
+                                                 "Не удалось изменить настройку звуковых оповещений", str(e))
 
     def toggle_speech_gift(self):
         """Включает или выключает озвучивание подарков"""
@@ -393,7 +393,7 @@ class MainWindow(QMainWindow):
         except Exception as e:
             self.logger.error(f"Ошибка при изменении настройки озвучивания подарков: {str(e)}", exc_info=True)
             self.error_handler.show_error_dialog(self, "Ошибка настроек", 
-                                             "Не удалось изменить настройку озвучивания подарков", str(e))
+                                                 "Не удалось изменить настройку озвучивания подарков", str(e))
 
     def toggle_speech_like(self):
         """Включает или выключает озвучивание лайков"""
@@ -403,7 +403,7 @@ class MainWindow(QMainWindow):
         except Exception as e:
             self.logger.error(f"Ошибка при изменении настройки озвучивания лайков: {str(e)}", exc_info=True)
             self.error_handler.show_error_dialog(self, "Ошибка настроек", 
-                                             "Не удалось изменить настройку озвучивания лайков", str(e))
+                                                 "Не удалось изменить настройку озвучивания лайков", str(e))
 
     def toggle_speech_member(self):
         """Включает или выключает озвучивание подключений"""
@@ -413,7 +413,7 @@ class MainWindow(QMainWindow):
         except Exception as e:
             self.logger.error(f"Ошибка при изменении настройки озвучивания подключений: {str(e)}", exc_info=True)
             self.error_handler.show_error_dialog(self, "Ошибка настроек", 
-                                             "Не удалось изменить настройку озвучивания подключений", str(e))
+                                                 "Не удалось изменить настройку озвучивания подключений", str(e))
 
     def save_settings(self):
         """Сохраняет настройки"""
@@ -443,7 +443,7 @@ class MainWindow(QMainWindow):
         except Exception as e:
             self.logger.error(f"Ошибка при сохранении настроек: {str(e)}", exc_info=True)
             self.error_handler.show_error_dialog(self, "Ошибка сохранения настроек", 
-                                             "Не удалось сохранить настройки", str(e))
+                                                 "Не удалось сохранить настройки", str(e))
 
     def update_sounds_list(self):
         """Обновляет список доступных звуков"""
@@ -477,7 +477,7 @@ class MainWindow(QMainWindow):
         except Exception as e:
             self.logger.error(f"Ошибка при обновлении списка привязок: {str(e)}", exc_info=True)
             self.error_handler.show_error_dialog(self, "Ошибка обновления списка", 
-                                             "Не удалось обновить список привязок", str(e))
+                                                 "Не удалось обновить список привязок", str(e))
 
     def upload_sound(self):
         """Загружает новый звуковой файл"""
@@ -507,7 +507,7 @@ class MainWindow(QMainWindow):
         except Exception as e:
             self.logger.error(f"Ошибка при загрузке звука: {str(e)}", exc_info=True)
             self.error_handler.show_error_dialog(self, "Ошибка загрузки звука", 
-                                             "Не удалось загрузить звуковой файл", str(e))
+                                                 "Не удалось загрузить звуковой файл", str(e))
 
     def add_sound_mapping(self):
         """Добавляет новую привязку звука к ID подарка"""
@@ -530,7 +530,7 @@ class MainWindow(QMainWindow):
         except Exception as e:
             self.logger.error(f"Ошибка при добавлении привязки звука: {str(e)}", exc_info=True)
             self.error_handler.show_error_dialog(self, "Ошибка привязки звука", 
-                                             "Не удалось привязать звук к ID подарка", str(e))
+                                                 "Не удалось привязать звук к ID подарка", str(e))
 
     def closeEvent(self, event):
         """Обработчик события закрытия окна"""
@@ -550,3 +550,13 @@ class MainWindow(QMainWindow):
             self.logger.error(f"Ошибка при закрытии окна: {str(e)}")
             # Принудительно завершаем приложение в случае ошибки
             event.accept()
+
+    def update_status(self, status):
+        """Обновляет статус в интерфейсе"""
+        try:
+            self.status_label.setText(f"Статус: {status}")
+            self.logger.info(f"Статус обновлен: {status}")
+        except Exception as e:
+            self.logger.error(f"Ошибка при обновлении статуса: {str(e)}", exc_info=True)
+            self.error_handler.show_error_dialog(self, "Ошибка обновления статуса", 
+                                                 "Не удалось обновить статус", str(e))
