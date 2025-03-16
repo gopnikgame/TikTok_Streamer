@@ -22,7 +22,7 @@ class MonitoringWorker(QObject):
         self.sound_service = sound_service
         self.gift_service = gift_service
         self.error_handler = ErrorHandler()
-        self.client = None
+        self.client = TikTokLiveClient(self.stream)
         self.client_task = None
         self.loop = None
         self.is_monitoring = False
@@ -40,12 +40,8 @@ class MonitoringWorker(QObject):
     async def _run_tiktok_client(self):
         self.logger.debug("Запуск метода _run_tiktok_client")
         try:
-            self.logger.debug("Создание нового event loop для TikTok клиента")
             self.loop = asyncio.get_event_loop()
-            self.logger.debug(f"Получен event loop: {self.loop}")
-            self.logger.debug(f"Инициализация TikTokLiveClient для {self.stream}")
             self.client = TikTokLiveClient(self.stream)
-            self.logger.debug(f"TikTokLiveClient создан: {self.client}")
 
             @self.client.on(ConnectEvent)
             async def on_connect(event: ConnectEvent):
@@ -60,7 +56,6 @@ class MonitoringWorker(QObject):
                 )
                 self.item_added.emit(item)
                 self.status_changed.emit("Мониторинг активен")
-                self.logger.debug("on_connect обработчик завершен")
 
             @self.client.on(DisconnectEvent)
             async def on_disconnect(event: DisconnectEvent):
@@ -75,7 +70,6 @@ class MonitoringWorker(QObject):
                 )
                 self.item_added.emit(item)
                 self.status_changed.emit("Мониторинг остановлен")
-                self.logger.debug("on_disconnect обработчик завершен")
 
             @self.client.on(GiftEvent)
             async def on_gift(event: GiftEvent):
@@ -92,14 +86,12 @@ class MonitoringWorker(QObject):
                             )
                             self.item_added.emit(item)
                             if self.settings.speech_gift:
-                                self.logger.debug(f"Озвучивание подарка от {event.user.nickname}")
                                 tasks.append(self.speech_service.speech(
                                     f"{event.user.nickname} прислал {event.gift.name} {event.repeat_count} раз",
                                     self.settings.speech_voice,
                                     self.settings.speech_rate
                                 ))
                             if self.settings.notify_gift:
-                                self.logger.debug(f"Воспроизведение звука для подарка ID {event.gift.id}")
                                 tasks.append(self.sound_service.play(event.gift.id, self.settings.notify_delay))
                     else:
                         item = TableItemView(
@@ -110,14 +102,12 @@ class MonitoringWorker(QObject):
                         )
                         self.item_added.emit(item)
                         if self.settings.speech_gift:
-                            self.logger.debug(f"Озвучивание подарка от {event.user.nickname}")
                             tasks.append(self.speech_service.speech(
                                 f"{event.user.nickname} прислал {event.gift.name}",
                                 self.settings.speech_voice,
                                 self.settings.speech_rate
                             ))
                         if self.settings.notify_gift:
-                            self.logger.debug(f"Воспроизведение звука для подарка ID {event.gift.id}")
                             tasks.append(self.sound_service.play(event.gift.id, self.settings.notify_delay))
                     await asyncio.gather(*tasks)
                 except Exception as e:
@@ -136,7 +126,6 @@ class MonitoringWorker(QObject):
                     self.item_added.emit(item)
                     if self.settings.speech_like:
                         like_text = self.settings.like_text.replace("@name", event.user.nickname)
-                        self.logger.debug(f"Озвучивание лайка: {like_text}")
                         await self.speech_service.speech(
                             like_text,
                             self.settings.speech_voice,
@@ -158,7 +147,6 @@ class MonitoringWorker(QObject):
                     self.item_added.emit(item)
                     if self.settings.speech_member:
                         join_text = self.settings.join_text.replace("@name", event.user.nickname)
-                        self.logger.debug(f"Озвучивание подключения: {join_text}")
                         await self.speech_service.speech(
                             join_text,
                             self.settings.speech_voice,
@@ -169,11 +157,8 @@ class MonitoringWorker(QObject):
 
             self.logger.info("Запуск клиента TikTok Live")
             self.client_task = self.loop.create_task(self.client.start())
-            self.logger.debug(f"Задача клиента создана: {self.client_task}")
             while not self.client_task.done() and not self.client_task.cancelled():
-                self.logger.debug(f"Состояние клиента: {self.client.connected}")
-                await asyncio.sleep(5)  # Проверяем состояние каждые 5 секунд
-            self.logger.debug("Цикл ожидания завершен")
+                await asyncio.sleep(5)
         except Exception as e:
             self.logger.error(f"Ошибка при подключении к TikTok: {str(e)}", exc_info=True)
             item = TableItemView(
@@ -191,14 +176,14 @@ class MonitoringWorker(QObject):
             if self.client and self.client.connected:
                 try:
                     self.logger.debug("Закрытие клиента TikTok")
-                    self.loop.run_until_complete(self.client.stop())
+                    await self.client.disconnect()  # Используем метод disconnect вместо несуществующего stop
                 except Exception as e:
                     self.logger.error(f"Ошибка при закрытии клиента TikTok: {str(e)}")
                     self.error_handler.show_error_dialog(None, "Ошибка", "Ошибка при закрытии клиента TikTok", str(e))
             if self.loop and self.loop.is_running():
                 self.logger.debug("Закрытие event loop")
                 try:
-                    self.loop.run_until_complete(self.loop.shutdown_asyncgens())
+                    await self.loop.shutdown_asyncgens()
                     self.loop.close()
                 except Exception as e:
                     self.logger.error(f"Ошибка при закрытии event loop: {str(e)}")
