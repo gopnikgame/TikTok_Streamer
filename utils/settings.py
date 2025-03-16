@@ -1,6 +1,7 @@
 import json
 import os
 import aiofiles
+import asyncio
 
 class Settings:
     _instance = None
@@ -30,6 +31,7 @@ class Settings:
         self.notify_delay = settings.get("notify_delay", 500)
         self.join_text = settings.get("join_text", "@name подключился к стриму")
         self.like_text = settings.get("like_text", "@name поставил лайк")
+        self.logging_level = settings.get("logging_level", "DEBUG")  # Добавлен параметр уровня логирования
     
     async def save(self):
         settings = {
@@ -42,7 +44,8 @@ class Settings:
             "speech_rate": self.speech_rate,
             "notify_delay": self.notify_delay,
             "join_text": self.join_text,
-            "like_text": self.like_text
+            "like_text": self.like_text,
+            "logging_level": self.logging_level
         }
         
         async with aiofiles.open(self.settings_file, 'w', encoding='utf-8') as f:
