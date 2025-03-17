@@ -1,7 +1,8 @@
 # views/main_window.py
 import os
+import asyncio
 import threading
-from PyQt6.QtWidgets import QMainWindow, QTabWidget
+from PyQt6.QtWidgets import QMainWindow, QTabWidget, QMessageBox, QFileDialog
 from PyQt6.QtCore import Qt, QAbstractTableModel, QModelIndex
 from PyQt6.QtGui import QStandardItemModel, QStandardItem, QPixmap, QImage
 from PyQt6 import sip
@@ -18,66 +19,7 @@ from datetime import datetime
 from .monitoring_tab import MonitoringTab
 from .settings_tab import SettingsTab
 from .sounds_tab import SoundsTab
-
-class EventsTableModel(QAbstractTableModel):
-    def __init__(self, viewmodel):
-        super().__init__()
-        self.viewmodel = viewmodel
-        self.headers = ["Время", "Пользователь", "Событие", "Уровень важности", "Подарок"]
-        self.logger = Logger().get_logger('EventsTableModel')
-        self.logger.info("Инициализация модели таблицы событий")
-    
-    def rowCount(self, parent=QModelIndex()):
-        self.logger.debug(f"Запрос количества строк: {len(self.viewmodel.item_list)}")
-        return len(self.viewmodel.item_list)
-    
-    def columnCount(self, parent=QModelIndex()):
-        self.logger.debug(f"Запрос количества столбцов: {len(self.headers)}")
-        return len(self.headers)
-    
-    def data(self, index, role=Qt.ItemDataRole.DisplayRole):
-        if not index.isValid() or not (0 <= index.row() < len(self.viewmodel.item_list)):
-            self.logger.debug(f"Неверный индекс: {index}")
-            return None
-        item = self.viewmodel.item_list[index.row()]
-        if role == Qt.ItemDataRole.DisplayRole:
-            if index.column() == 0:
-                self.logger.debug(f"Запрос данных для строки {index.row()}, столбца {index.column()}: {item.timestamp.strftime('%H:%M:%S')}")
-                return item.timestamp.strftime("%H:%M:%S")
-            elif index.column() == 1:
-                self.logger.debug(f"Запрос данных для строки {index.row()}, столбца {index.column()}: {item.name}")
-                return item.name
-            elif index.column() == 2:
-                self.logger.debug(f"Запрос данных для строки {index.row()}, столбца {index.column()}: {item.event}")
-                return item.event
-            elif index.column() == 3:
-                self.logger.debug(f"Запрос данных для строки {index.row()}, столбца {index.column()}: {item.alert_level.name}")
-                return item.alert_level.name
-            elif index.column() == 4:
-                self.logger.debug(f"Запрос данных для строки {index.row()}, столбца {index.column()}: {item.gift_name}")
-                return item.gift_name
-        elif role == Qt.ItemDataRole.DecorationRole:
-            if index.column() == 4:
-                if item.gift_image:
-                    pixmap = self.base64_to_pixmap(item.gift_image)
-                    return pixmap.scaled(50, 50, Qt.AspectRatioMode.KeepAspectRatio)
-        elif role == Qt.ItemDataRole.BackgroundRole:
-            if item.alert_level == AlertLevel.IMPORTANT:
-                self.logger.debug(f"Запрос фона для строки {index.row()} с уровнем важности: {item.alert_level}")
-                return Qt.GlobalColor.yellow
-        return None
-    
-    def headerData(self, section, orientation, role):
-        if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole:
-            self.logger.debug(f"Запрос заголовка для секции {section}: {self.headers[section]}")
-            return self.headers[section]
-        return None
-    
-    def base64_to_pixmap(self, base64_string):
-        image_data = QByteArray.fromBase64(base64_string.encode('utf-8'))
-        image = QImage()
-        image.loadFromData(image_data)
-        return QPixmap.fromImage(image)
+from .events_table_model import EventsTableModel  # Импортируем EventsTableModel из отдельного файла
 
 class MainWindow(QMainWindow):
     def __init__(self, viewmodel):
@@ -127,10 +69,21 @@ class MainWindow(QMainWindow):
         """Обновляет состояние интерфейса в зависимости от статуса мониторинга"""
         try:
             if self.viewmodel.is_processing:
+                self.toggle_btn.setEnabled(False)
+                self.status_label.setText("Статус: Подключение...")
+                self.stream_input.setEnabled(False)
                 self.logger.debug("Обновлено состояние: Подключение...")
             elif self.viewmodel.is_monitoring:
+                self.toggle_btn.setText("Остановить мониторинг")
+                self.toggle_btn.setEnabled(True)
+                self.status_label.setText(f"Статус: Мониторинг стрима {self.viewmodel.stream}")
+                self.stream_input.setEnabled(False)
                 self.logger.debug(f"Обновлено состояние: Мониторинг стрима {self.viewmodel.stream}")
             else:
+                self.toggle_btn.setText("Начать мониторинг")
+                self.toggle_btn.setEnabled(True)
+                self.status_label.setText("Статус: Готов к мониторингу")
+                self.stream_input.setEnabled(True)
                 self.logger.debug("Обновлено состояние: Готов к мониторингу")
         except Exception as e:
             self.logger.error(f"Ошибка при обновлении состояния мониторинга: {str(e)}", exc_info=True)
@@ -153,6 +106,185 @@ class MainWindow(QMainWindow):
                 self.error_handler.handle_update_error(None, e)
             except Exception as inner_e:
                 self.logger.error(f"Ошибка при обработке ошибки: {str(inner_e)}")
+    
+    def toggle_monitoring(self):
+        """Включает или выключает мониторинг"""
+        try:
+            if self.viewmodel.is_monitoring:
+                self.logger.info("Остановка мониторинга")
+                self.viewmodel.stop_monitoring()
+                return
+            # Получаем ID стрима из поля ввода
+            stream = self.stream_input.text().strip()
+            if not stream:
+                self.logger.warning("Попытка начать мониторинг без указания ID стрима")
+                self.error_handler.show_validation_error(self, "Пожалуйста, укажите ID стрима")
+                return
+            # Обновляем ID стрима в модели и запускаем мониторинг
+            self.logger.info(f"Начало мониторинга стрима: {stream}")
+            self.viewmodel.stream = stream
+            self.viewmodel.start_monitoring()
+        except Exception as e:
+            self.logger.error(f"Ошибка при переключении мониторинга: {str(e)}", exc_info=True)
+            self.error_handler.show_error_dialog(self, "Ошибка мониторинга", 
+                                                 "Не удалось изменить состояние мониторинга", str(e))
+    
+    def toggle_notify_gift(self):
+        """Включает или выключает звуковые оповещения о подарках"""
+        try:
+            self.viewmodel.notify_gift = self.notify_chk.isChecked()
+            self.logger.debug(f"Настройка звуковых оповещений изменена: {self.viewmodel.notify_gift}")
+        except Exception as e:
+            self.logger.error(f"Ошибка при изменении настройки звуковых оповещений: {str(e)}", exc_info=True)
+            self.error_handler.show_error_dialog(self, "Ошибка настроек", 
+                                                 "Не удалось изменить настройку звуковых оповещений", str(e))
+    
+    def toggle_speech_gift(self):
+        """Включает или выключает озвучивание подарков"""
+        try:
+            self.viewmodel.speech_gift = self.speech_gift_chk.isChecked()
+            self.logger.debug(f"Настройка озвучивания подарков изменена: {self.viewmodel.speech_gift}")
+        except Exception as e:
+            self.logger.error(f"Ошибка при изменении настройки озвучивания подарков: {str(e)}", exc_info=True)
+            self.error_handler.show_error_dialog(self, "Ошибка настроек", 
+                                                 "Не удалось изменить настройку озвучивания подарков", str(e))
+    
+    def toggle_speech_like(self):
+        """Включает или выключает озвучивание лайков"""
+        try:
+            self.viewmodel.speech_like = self.speech_like_chk.isChecked()
+            self.logger.debug(f"Настройка озвучивания лайков изменена: {self.viewmodel.speech_like}")
+        except Exception as e:
+            self.logger.error(f"Ошибка при изменении настройки озвучивания лайков: {str(e)}", exc_info=True)
+            self.error_handler.show_error_dialog(self, "Ошибка настроек", 
+                                                 "Не удалось изменить настройку озвучивания лайков", str(e))
+    
+    def toggle_speech_member(self):
+        """Включает или выключает озвучивание подключений"""
+        try:
+            self.viewmodel.speech_member = self.speech_member_chk.isChecked()
+            self.logger.debug(f"Настройка озвучивания подключений изменена: {self.viewmodel.speech_member}")
+        except Exception as e:
+            self.logger.error(f"Ошибка при изменении настройки озвучивания подключений: {str(e)}", exc_info=True)
+            self.error_handler.show_error_dialog(self, "Ошибка настроек", 
+                                                 "Не удалось изменить настройку озвучивания подключений", str(e))
+    
+    def save_settings(self):
+        """Сохраняет настройки"""
+        try:
+            # Валидация данных
+            if self.join_text_input.text().strip() == "":
+                self.error_handler.show_validation_error(self, "Текст для подключения не может быть пустым")
+                return
+            if self.like_text_input.text().strip() == "":
+                self.error_handler.show_validation_error(self, "Текст для лайка не может быть пустым")
+                return
+            # Голос
+            selected_voice = self.voice_combo.currentText()
+            if selected_voice:
+                self.viewmodel.settings.speech_voice = selected_voice
+            # Скорость речи
+            self.viewmodel.settings.speech_rate = self.rate_slider.value()
+            # Тексты
+            self.viewmodel.settings.join_text = self.join_text_input.text()
+            self.viewmodel.settings.like_text = self.like_text_input.text()
+            # Задержка звуковых уведомлений
+            self.viewmodel.settings.notify_delay = self.delay_input.value()
+            # Сохраняем настройки
+            asyncio.run(self.viewmodel.settings.save())
+            self.logger.info("Настройки успешно сохранены")
+            QMessageBox.information(self, "Настройки", "Настройки успешно сохранены")
+        except Exception as e:
+            self.logger.error(f"Ошибка при сохранении настроек: {str(e)}", exc_info=True)
+            self.error_handler.show_error_dialog(self, "Ошибка сохранения настроек", 
+                                                 "Не удалось сохранить настройки", str(e))
+    
+    def update_sounds_list(self):
+        """Обновляет список доступных звуков"""
+        try:
+            self.sounds_model.clear()
+            self.sound_combo.clear()
+            if not os.path.exists("assets"):
+                os.makedirs("assets")
+                self.logger.info("Создана директория assets")
+            # Получаем список звуковых файлов
+            sound_files = [f for f in os.listdir("assets") if f.lower().endswith(('.mp3', '.wav'))]
+            for sound in sound_files:
+                self.sounds_model.appendRow(QStandardItem(sound))
+                self.sound_combo.addItem(sound)
+            self.logger.debug(f"Обновлен список звуков: {len(sound_files)} файлов")
+        except Exception as e:
+            self.logger.error(f"Ошибка при обновлении списка звуков: {str(e)}", exc_info=True)
+            self.error_handler.handle_file_error(self, e, "assets")
+    
+    def update_mappings_list(self):
+        """Обновляет список привязок звуков к ID подарков"""
+        try:
+            self.mappings_model.clear()
+            # Получаем текущие привязки
+            mappings = self.viewmodel.sound_service.get_mappings()
+            for gift_id, sound_file in mappings.items():
+                self.mappings_model.appendRow(
+                    QStandardItem(f"ID {gift_id}: {sound_file}")
+                )
+            self.logger.debug(f"Обновлен список привязок: {len(mappings)} привязок")
+        except Exception as e:
+            self.logger.error(f"Ошибка при обновлении списка привязок: {str(e)}", exc_info=True)
+            self.error_handler.show_error_dialog(self, "Ошибка обновления списка", 
+                                                 "Не удалось обновить список привязок", str(e))
+    
+    def upload_sound(self):
+        """Загружает новый звуковой файл"""
+        try:
+            file_path, _ = QFileDialog.getOpenFileName(
+                self, "Выберите звуковой файл", "", "Аудио файлы (*.mp3 *.wav)"
+            )
+            if not file_path:
+                return
+            # Копируем файл в директорию assets
+            file_name = os.path.basename(file_path)
+            destination = os.path.join("assets", file_name)
+            try:
+                # Проверяем, существует ли директория assets
+                if not os.path.exists("assets"):
+                    os.makedirs("assets")
+                # Копируем файл
+                import shutil
+                shutil.copy2(file_path, destination)
+                self.logger.info(f"Звуковой файл загружен: {file_name}")
+                # Обновляем списки
+                self.update_sounds_list()
+                QMessageBox.information(self, "Загрузка звука", f"Файл {file_name} успешно загружен")
+            except Exception as e:
+                self.logger.error(f"Ошибка при копировании звукового файла: {str(e)}", exc_info=True)
+                self.error_handler.handle_file_error(self, e, destination)
+        except Exception as e:
+            self.logger.error(f"Ошибка при загрузке звука: {str(e)}", exc_info=True)
+            self.error_handler.show_error_dialog(self, "Ошибка загрузки звука", 
+                                                 "Не удалось загрузить звуковой файл", str(e))
+    
+    def add_sound_mapping(self):
+        """Добавляет новую привязку звука к ID подарка"""
+        try:
+            gift_id = self.gift_id_input.value()
+            sound_file = self.sound_combo.currentText()
+            if not sound_file:
+                self.error_handler.show_validation_error(self, "Пожалуйста, выберите звуковой файл")
+                return
+            # Добавляем привязку
+            self.viewmodel.sound_service.add_mapping(gift_id, sound_file)
+            self.logger.info(f"Добавлена привязка звука: ID {gift_id} -> {sound_file}")
+            # Обновляем список привязок
+            self.update_mappings_list()
+            QMessageBox.information(
+                self, 
+                "Привязка звука", 
+                f"Подарок с ID {gift_id} теперь будет сопровождаться звуком {sound_file}"
+            )
+        except Exception as e:
+            self.logger.error(f"Ошибка при добавлении привязки звука: {str(e)}", exc_info=True)
+            self.error_handler.show_error_dialog(self, "Ошибка привязки звука", 
+                                                 "Не удалось привязать звук к ID подарка", str(e))
     
     def closeEvent(self, event):
         """Обработчик события закрытия окна"""
