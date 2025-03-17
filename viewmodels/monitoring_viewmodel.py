@@ -1,4 +1,4 @@
-# viewmodels/monitoring_viewmodel.py
+# monitoring_viewmodel.py
 import os
 import threading
 import asyncio
@@ -217,9 +217,11 @@ class MonitoringViewModel(QObject):
         self.logger.info("Мониторинг остановлен")
 
     def on_status_changed(self, status):
+        self.logger.debug(f"Статус изменен: {status}")
         self.status_changed.emit(status)
 
     def on_item_added(self, item):
+        self.logger.debug(f"Получено новое событие: {item.timestamp} - {item.name} - {item.event}")
         self.add_item(item)
 
     def on_thread_finished(self):
