@@ -1,7 +1,8 @@
 # monitoring_worker.py
 import asyncio
 from TikTokLive import TikTokLiveClient
-from TikTokLive.events import GiftEvent, LikeEvent, JoinEvent, ConnectEvent, DisconnectEvent, SignatureRateLimitError
+from TikTokLive.events import GiftEvent, LikeEvent, JoinEvent, ConnectEvent, DisconnectEvent
+from TikTokLive.client.errors import SignatureRateLimitError
 from models.data_models import TableItemView, AlertLevel
 from utils.settings import Settings
 from utils.logger import Logger
