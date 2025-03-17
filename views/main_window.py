@@ -1,4 +1,3 @@
-# views/main_window.py
 import os
 import asyncio
 import threading
@@ -14,7 +13,6 @@ from services.speech_service import SpeechService
 from services.sound_service import SoundService
 from utils.settings import Settings
 from viewmodels.monitoring_viewmodel import MonitoringViewModel
-from PyQt6.QtCore import QByteArray
 from datetime import datetime
 from .monitoring_tab import MonitoringTab
 from .settings_tab import SettingsTab
@@ -42,12 +40,13 @@ class MainWindow(QMainWindow):
             self.setWindowTitle("TTStreamerPy")
             self.resize(800, 600)
             # Создаем вкладки
-            tabs = QTabWidget()
-            tabs.addTab(MonitoringTab(self.viewmodel, self), "Мониторинг")
-            tabs.addTab(SettingsTab(self.viewmodel, self), "Настройки")
-            tabs.addTab(SoundsTab(self.viewmodel, self), "Звуки")
+            self.tabs = QTabWidget()
+            self.monitoring_tab = MonitoringTab(self.viewmodel, self)
+            self.tabs.addTab(self.monitoring_tab, "Мониторинг")
+            self.tabs.addTab(SettingsTab(self.viewmodel, self), "Настройки")
+            self.tabs.addTab(SoundsTab(self.viewmodel, self), "Звуки")
             # Устанавливаем основной виджет
-            self.setCentralWidget(tabs)
+            self.setCentralWidget(self.tabs)
             self.logger.debug("Интерфейс инициализирован")
         except Exception as e:
             self.logger.error(f"Ошибка инициализации интерфейса: {str(e)}", exc_info=True)
@@ -69,21 +68,21 @@ class MainWindow(QMainWindow):
         """Обновляет состояние интерфейса в зависимости от статуса мониторинга"""
         try:
             if self.viewmodel.is_processing:
-                self.toggle_btn.setEnabled(False)
-                self.status_label.setText("Статус: Подключение...")
-                self.stream_input.setEnabled(False)
+                self.monitoring_tab.toggle_btn.setEnabled(False)
+                self.monitoring_tab.status_label.setText("Статус: Подключение...")
+                self.monitoring_tab.stream_input.setEnabled(False)
                 self.logger.debug("Обновлено состояние: Подключение...")
             elif self.viewmodel.is_monitoring:
-                self.toggle_btn.setText("Остановить мониторинг")
-                self.toggle_btn.setEnabled(True)
-                self.status_label.setText(f"Статус: Мониторинг стрима {self.viewmodel.stream}")
-                self.stream_input.setEnabled(False)
+                self.monitoring_tab.toggle_btn.setText("Остановить мониторинг")
+                self.monitoring_tab.toggle_btn.setEnabled(True)
+                self.monitoring_tab.status_label.setText(f"Статус: Мониторинг стрима {self.viewmodel.stream}")
+                self.monitoring_tab.stream_input.setEnabled(False)
                 self.logger.debug(f"Обновлено состояние: Мониторинг стрима {self.viewmodel.stream}")
             else:
-                self.toggle_btn.setText("Начать мониторинг")
-                self.toggle_btn.setEnabled(True)
-                self.status_label.setText("Статус: Готов к мониторингу")
-                self.stream_input.setEnabled(True)
+                self.monitoring_tab.toggle_btn.setText("Начать мониторинг")
+                self.monitoring_tab.toggle_btn.setEnabled(True)
+                self.monitoring_tab.status_label.setText("Статус: Готов к мониторингу")
+                self.monitoring_tab.stream_input.setEnabled(True)
                 self.logger.debug("Обновлено состояние: Готов к мониторингу")
         except Exception as e:
             self.logger.error(f"Ошибка при обновлении состояния мониторинга: {str(e)}", exc_info=True)
@@ -115,7 +114,7 @@ class MainWindow(QMainWindow):
                 self.viewmodel.stop_monitoring()
                 return
             # Получаем ID стрима из поля ввода
-            stream = self.stream_input.text().strip()
+            stream = self.monitoring_tab.stream_input.text().strip()
             if not stream:
                 self.logger.warning("Попытка начать мониторинг без указания ID стрима")
                 self.error_handler.show_validation_error(self, "Пожалуйста, укажите ID стрима")
@@ -132,7 +131,7 @@ class MainWindow(QMainWindow):
     def toggle_notify_gift(self):
         """Включает или выключает звуковые оповещения о подарках"""
         try:
-            self.viewmodel.notify_gift = self.notify_chk.isChecked()
+            self.viewmodel.notify_gift = self.monitoring_tab.notify_chk.isChecked()
             self.logger.debug(f"Настройка звуковых оповещений изменена: {self.viewmodel.notify_gift}")
         except Exception as e:
             self.logger.error(f"Ошибка при изменении настройки звуковых оповещений: {str(e)}", exc_info=True)
@@ -142,7 +141,7 @@ class MainWindow(QMainWindow):
     def toggle_speech_gift(self):
         """Включает или выключает озвучивание подарков"""
         try:
-            self.viewmodel.speech_gift = self.speech_gift_chk.isChecked()
+            self.viewmodel.speech_gift = self.monitoring_tab.speech_gift_chk.isChecked()
             self.logger.debug(f"Настройка озвучивания подарков изменена: {self.viewmodel.speech_gift}")
         except Exception as e:
             self.logger.error(f"Ошибка при изменении настройки озвучивания подарков: {str(e)}", exc_info=True)
@@ -152,7 +151,7 @@ class MainWindow(QMainWindow):
     def toggle_speech_like(self):
         """Включает или выключает озвучивание лайков"""
         try:
-            self.viewmodel.speech_like = self.speech_like_chk.isChecked()
+            self.viewmodel.speech_like = self.monitoring_tab.speech_like_chk.isChecked()
             self.logger.debug(f"Настройка озвучивания лайков изменена: {self.viewmodel.speech_like}")
         except Exception as e:
             self.logger.error(f"Ошибка при изменении настройки озвучивания лайков: {str(e)}", exc_info=True)
@@ -162,7 +161,7 @@ class MainWindow(QMainWindow):
     def toggle_speech_member(self):
         """Включает или выключает озвучивание подключений"""
         try:
-            self.viewmodel.speech_member = self.speech_member_chk.isChecked()
+            self.viewmodel.speech_member = self.monitoring_tab.speech_member_chk.isChecked()
             self.logger.debug(f"Настройка озвучивания подключений изменена: {self.viewmodel.speech_member}")
         except Exception as e:
             self.logger.error(f"Ошибка при изменении настройки озвучивания подключений: {str(e)}", exc_info=True)
@@ -173,23 +172,25 @@ class MainWindow(QMainWindow):
         """Сохраняет настройки"""
         try:
             # Валидация данных
-            if self.join_text_input.text().strip() == "":
+            if self.monitoring_tab.join_text_input.text().strip() == "":
                 self.error_handler.show_validation_error(self, "Текст для подключения не может быть пустым")
                 return
-            if self.like_text_input.text().strip() == "":
+            if self.monitoring_tab.like_text_input.text().strip() == "":
                 self.error_handler.show_validation_error(self, "Текст для лайка не может быть пустым")
                 return
             # Голос
-            selected_voice = self.voice_combo.currentText()
+            selected_voice = self.monitoring_tab.voice_combo.currentText()
             if selected_voice:
                 self.viewmodel.settings.speech_voice = selected_voice
             # Скорость речи
-            self.viewmodel.settings.speech_rate = self.rate_slider.value()
+            self.viewmodel.settings.speech_rate = self.monitoring_tab.rate_slider.value()
+            # Громкость речи
+            self.viewmodel.settings.speech_volume = self.monitoring_tab.volume_slider.value() / 100.0
             # Тексты
-            self.viewmodel.settings.join_text = self.join_text_input.text()
-            self.viewmodel.settings.like_text = self.like_text_input.text()
+            self.viewmodel.settings.join_text = self.monitoring_tab.join_text_input.text()
+            self.viewmodel.settings.like_text = self.monitoring_tab.like_text_input.text()
             # Задержка звуковых уведомлений
-            self.viewmodel.settings.notify_delay = self.delay_input.value()
+            self.viewmodel.settings.notify_delay = self.monitoring_tab.delay_input.value()
             # Сохраняем настройки
             asyncio.run(self.viewmodel.settings.save())
             self.logger.info("Настройки успешно сохранены")
@@ -308,7 +309,7 @@ class MainWindow(QMainWindow):
     def update_status(self, status):
         """Обновляет статус в интерфейсе"""
         try:
-            self.status_label.setText(f"Статус: {status}")
+            self.monitoring_tab.status_label.setText(f"Статус: {status}")
             self.logger.info(f"Статус обновлен: {status}")
         except Exception as e:
             self.logger.error(f"Ошибка при обновлении статуса: {str(e)}", exc_info=True)
