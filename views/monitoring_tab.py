@@ -1,3 +1,4 @@
+# monitoring_tab.py
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QLabel, QCheckBox, QTableView
 from PyQt6.QtCore import Qt, QModelIndex
 from models.data_models import AlertLevel, TableItemView, GiftData
@@ -13,7 +14,7 @@ class MonitoringTab(QWidget):
         self.viewmodel = viewmodel
         self.error_handler = ErrorHandler()
         self.logger = Logger().get_logger('MonitoringTab')
-        self.logger.info("Initializing the monitoring tab")
+        self.logger.info("Инициализация вкладки мониторинга")
         self.init_ui()
         self.bind_events()
         self.update_monitoring_state()
@@ -74,6 +75,8 @@ class MonitoringTab(QWidget):
             self.speech_gift_chk.clicked.connect(self.toggle_speech_gift)
             self.speech_like_chk.clicked.connect(self.toggle_speech_like)
             self.speech_member_chk.clicked.connect(self.toggle_speech_member)
+            self.viewmodel.status_changed.connect(self.update_status_label)
+            self.viewmodel.item_added.connect(self.table_model.add_item)
             self.logger.debug("Обработчики событий привязаны")
         except Exception as e:
             self.logger.error(f"Ошибка при привязке обработчиков событий: {str(e)}", exc_info=True)
@@ -104,6 +107,16 @@ class MonitoringTab(QWidget):
             self.logger.error(f"Ошибка при обновлении состояния мониторинга: {str(e)}", exc_info=True)
             self.error_handler.show_error_dialog(self, "Ошибка обновления интерфейса", 
                                              "Не удалось обновить состояние интерфейса", str(e))
+    
+    def update_status_label(self, status):
+        """Обновляет текст статуса"""
+        try:
+            self.status_label.setText(f"Статус: {status}")
+            self.logger.debug(f"Статус обновлен: {status}")
+        except Exception as e:
+            self.logger.error(f"Ошибка при обновлении статуса: {str(e)}", exc_info=True)
+            self.error_handler.show_error_dialog(self, "Ошибка обновления статуса", 
+                                                 "Не удалось обновить статус", str(e))
     
     def toggle_monitoring(self):
         """Включает или выключает мониторинг"""
