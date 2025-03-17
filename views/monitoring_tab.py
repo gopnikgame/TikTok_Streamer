@@ -1,4 +1,3 @@
-# views/monitoring_tab.py
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QLabel, QCheckBox, QTableView
 from PyQt6.QtCore import Qt, QModelIndex
 from models.data_models import AlertLevel, TableItemView, GiftData
@@ -6,7 +5,7 @@ from utils.error_handler import ErrorHandler
 from utils.logger import Logger
 from PyQt6 import sip
 from datetime import datetime
-from .events_table_model import EventsTableModel  # Импортируем EventsTableModel из отдельного файла
+from .events_table_model import EventsTableModel  # РРјРїРѕСЂС‚РёСЂСѓРµРј EventsTableModel РёР· РѕС‚РґРµР»СЊРЅРѕРіРѕ С„Р°Р№Р»Р°
 
 class MonitoringTab(QWidget):
     def __init__(self, viewmodel, parent=None):
@@ -18,152 +17,152 @@ class MonitoringTab(QWidget):
         self.init_ui()
         self.bind_events()
         self.update_monitoring_state()
-        self.logger.debug("Вкладка мониторинга инициализирована")
-
+        self.logger.debug("Р’РєР»Р°РґРєР° РјРѕРЅРёС‚РѕСЂРёРЅРіР° РёРЅРёС†РёР°Р»РёР·РёСЂРѕРІР°РЅР°")
+    
     def init_ui(self):
-        """Инициализирует пользовательский интерфейс вкладки мониторинга"""
+        """РРЅРёС†РёР°Р»РёР·РёСЂСѓРµС‚ РїРѕР»СЊР·РѕРІР°С‚РµР»СЊСЃРєРёР№ РёРЅС‚РµСЂС„РµР№СЃ РІРєР»Р°РґРєРё РјРѕРЅРёС‚РѕСЂРёРЅРіР°"""
         try:
             layout = QVBoxLayout()
-            # Строка с полем для ID стрима и кнопкой запуска
+            # РЎС‚СЂРѕРєР° СЃ РїРѕР»РµРј РґР»СЏ ID СЃС‚СЂРёРјР° Рё РєРЅРѕРїРєРѕР№ Р·Р°РїСѓСЃРєР°
             stream_layout = QHBoxLayout()
-            stream_label = QLabel("ID стрима:")
+            stream_label = QLabel("ID СЃС‚СЂРёРјР°:")
             self.stream_input = QLineEdit()
             self.stream_input.setText(self.viewmodel.stream)
-            self.toggle_btn = QPushButton("Начать мониторинг")
+            self.toggle_btn = QPushButton("РќР°С‡Р°С‚СЊ РјРѕРЅРёС‚РѕСЂРёРЅРі")
             stream_layout.addWidget(stream_label)
             stream_layout.addWidget(self.stream_input, 1)
             stream_layout.addWidget(self.toggle_btn)
             layout.addLayout(stream_layout)
-            self.logger.debug("Создана строка для ID стрима и кнопки запуска")
-            # Чекбоксы для настроек
+            self.logger.debug("РЎРѕР·РґР°РЅР° СЃС‚СЂРѕРєР° РґР»СЏ ID СЃС‚СЂРёРјР° Рё РєРЅРѕРїРєРё Р·Р°РїСѓСЃРєР°")
+            # Р§РµРєР±РѕРєСЃС‹ РґР»СЏ РЅР°СЃС‚СЂРѕРµРє
             checks_layout = QHBoxLayout()
-            self.notify_chk = QCheckBox("Звуковое оповещение")
+            self.notify_chk = QCheckBox("Р—РІСѓРєРѕРІРѕРµ РѕРїРѕРІРµС‰РµРЅРёРµ")
             self.notify_chk.setChecked(self.viewmodel.notify_gift)
-            self.speech_gift_chk = QCheckBox("Озвучивать подарки")
+            self.speech_gift_chk = QCheckBox("РћР·РІСѓС‡РёРІР°С‚СЊ РїРѕРґР°СЂРєРё")
             self.speech_gift_chk.setChecked(self.viewmodel.speech_gift)
-            self.speech_like_chk = QCheckBox("Озвучивать лайки")
+            self.speech_like_chk = QCheckBox("РћР·РІСѓС‡РёРІР°С‚СЊ Р»Р°Р№РєРё")
             self.speech_like_chk.setChecked(self.viewmodel.speech_like)
-            self.speech_member_chk = QCheckBox("Озвучивать подключения")
+            self.speech_member_chk = QCheckBox("РћР·РІСѓС‡РёРІР°С‚СЊ РїРѕРґРєР»СЋС‡РµРЅРёСЏ")
             self.speech_member_chk.setChecked(self.viewmodel.speech_member)
             checks_layout.addWidget(self.notify_chk)
             checks_layout.addWidget(self.speech_gift_chk)
             checks_layout.addWidget(self.speech_like_chk)
             checks_layout.addWidget(self.speech_member_chk)
             layout.addLayout(checks_layout)
-            self.logger.debug("Созданы чекбоксы для настроек")
-            # Таблица событий
+            self.logger.debug("РЎРѕР·РґР°РЅС‹ С‡РµРєР±РѕРєСЃС‹ РґР»СЏ РЅР°СЃС‚СЂРѕРµРє")
+            # РўР°Р±Р»РёС†Р° СЃРѕР±С‹С‚РёР№
             self.table_model = EventsTableModel(self.viewmodel)
             self.table_view = QTableView()
             self.table_view.setModel(self.table_model)
             self.table_view.horizontalHeader().setStretchLastSection(True)
             layout.addWidget(self.table_view, 1)
-            self.logger.debug("Создана таблица событий")
-            # Статус
-            self.status_label = QLabel("Статус: Готов к мониторингу")
+            self.logger.debug("РЎРѕР·РґР°РЅР° С‚Р°Р±Р»РёС†Р° СЃРѕР±С‹С‚РёР№")
+            # РЎС‚Р°С‚СѓСЃ
+            self.status_label = QLabel("РЎС‚Р°С‚СѓСЃ: Р“РѕС‚РѕРІ Рє РјРѕРЅРёС‚РѕСЂРёРЅРіСѓ")
             layout.addWidget(self.status_label)
             self.setLayout(layout)
         except Exception as e:
-            self.logger.error(f"Ошибка при создании вкладки мониторинга: {str(e)}", exc_info=True)
-            self.error_handler.show_error_dialog(self, "Ошибка создания интерфейса", 
-                                              "Не удалось создать вкладку мониторинга", str(e))
-
+            self.logger.error(f"РћС€РёР±РєР° РїСЂРё СЃРѕР·РґР°РЅРёРё РІРєР»Р°РґРєРё РјРѕРЅРёС‚РѕСЂРёРЅРіР°: {str(e)}", exc_info=True)
+            self.error_handler.show_error_dialog(self, "РћС€РёР±РєР° СЃРѕР·РґР°РЅРёСЏ РёРЅС‚РµСЂС„РµР№СЃР°", 
+                                              "РќРµ СѓРґР°Р»РѕСЃСЊ СЃРѕР·РґР°С‚СЊ РІРєР»Р°РґРєСѓ РјРѕРЅРёС‚РѕСЂРёРЅРіР°", str(e))
+    
     def bind_events(self):
-        """Привязывает обработчики событий к изменениям ViewModel"""
+        """РџСЂРёРІСЏР·С‹РІР°РµС‚ РѕР±СЂР°Р±РѕС‚С‡РёРєРё СЃРѕР±С‹С‚РёР№ Рє РёР·РјРµРЅРµРЅРёСЏРј ViewModel"""
         try:
             self.toggle_btn.clicked.connect(self.toggle_monitoring)
             self.notify_chk.clicked.connect(self.toggle_notify_gift)
             self.speech_gift_chk.clicked.connect(self.toggle_speech_gift)
             self.speech_like_chk.clicked.connect(self.toggle_speech_like)
             self.speech_member_chk.clicked.connect(self.toggle_speech_member)
-            self.logger.debug("Обработчики событий привязаны")
+            self.logger.debug("РћР±СЂР°Р±РѕС‚С‡РёРєРё СЃРѕР±С‹С‚РёР№ РїСЂРёРІСЏР·Р°РЅС‹")
         except Exception as e:
-            self.logger.error(f"Ошибка при привязке обработчиков событий: {str(e)}", exc_info=True)
-            self.error_handler.show_error_dialog(self, "Ошибка инициализации", 
-                                             "Не удалось привязать обработчики событий", str(e))
-
+            self.logger.error(f"РћС€РёР±РєР° РїСЂРё РїСЂРёРІСЏР·РєРµ РѕР±СЂР°Р±РѕС‚С‡РёРєРѕРІ СЃРѕР±С‹С‚РёР№: {str(e)}", exc_info=True)
+            self.error_handler.show_error_dialog(self, "РћС€РёР±РєР° РёРЅРёС†РёР°Р»РёР·Р°С†РёРё", 
+                                             "РќРµ СѓРґР°Р»РѕСЃСЊ РїСЂРёРІСЏР·Р°С‚СЊ РѕР±СЂР°Р±РѕС‚С‡РёРєРё СЃРѕР±С‹С‚РёР№", str(e))
+    
     def update_monitoring_state(self):
-        """Обновляет состояние интерфейса в зависимости от статуса мониторинга"""
+        """РћР±РЅРѕРІР»СЏРµС‚ СЃРѕСЃС‚РѕСЏРЅРёРµ РёРЅС‚РµСЂС„РµР№СЃР° РІ Р·Р°РІРёСЃРёРјРѕСЃС‚Рё РѕС‚ СЃС‚Р°С‚СѓСЃР° РјРѕРЅРёС‚РѕСЂРёРЅРіР°"""
         try:
             if self.viewmodel.is_processing:
                 self.toggle_btn.setEnabled(False)
-                self.status_label.setText("Статус: Подключение...")
+                self.status_label.setText("РЎС‚Р°С‚СѓСЃ: РџРѕРґРєР»СЋС‡РµРЅРёРµ...")
                 self.stream_input.setEnabled(False)
-                self.logger.debug("Обновлено состояние: Подключение...")
+                self.logger.debug("РћР±РЅРѕРІР»РµРЅРѕ СЃРѕСЃС‚РѕСЏРЅРёРµ: РџРѕРґРєР»СЋС‡РµРЅРёРµ...")
             elif self.viewmodel.is_monitoring:
-                self.toggle_btn.setText("Остановить мониторинг")
+                self.toggle_btn.setText("РћСЃС‚Р°РЅРѕРІРёС‚СЊ РјРѕРЅРёС‚РѕСЂРёРЅРі")
                 self.toggle_btn.setEnabled(True)
-                self.status_label.setText(f"Статус: Мониторинг стрима {self.viewmodel.stream}")
+                self.status_label.setText(f"РЎС‚Р°С‚СѓСЃ: РњРѕРЅРёС‚РѕСЂРёРЅРі СЃС‚СЂРёРјР° {self.viewmodel.stream}")
                 self.stream_input.setEnabled(False)
-                self.logger.debug(f"Обновлено состояние: Мониторинг стрима {self.viewmodel.stream}")
+                self.logger.debug(f"РћР±РЅРѕРІР»РµРЅРѕ СЃРѕСЃС‚РѕСЏРЅРёРµ: РњРѕРЅРёС‚РѕСЂРёРЅРі СЃС‚СЂРёРјР° {self.viewmodel.stream}")
             else:
-                self.toggle_btn.setText("Начать мониторинг")
+                self.toggle_btn.setText("РќР°С‡Р°С‚СЊ РјРѕРЅРёС‚РѕСЂРёРЅРі")
                 self.toggle_btn.setEnabled(True)
-                self.status_label.setText("Статус: Готов к мониторингу")
+                self.status_label.setText("РЎС‚Р°С‚СѓСЃ: Р“РѕС‚РѕРІ Рє РјРѕРЅРёС‚РѕСЂРёРЅРіСѓ")
                 self.stream_input.setEnabled(True)
-                self.logger.debug("Обновлено состояние: Готов к мониторингу")
+                self.logger.debug("РћР±РЅРѕРІР»РµРЅРѕ СЃРѕСЃС‚РѕСЏРЅРёРµ: Р“РѕС‚РѕРІ Рє РјРѕРЅРёС‚РѕСЂРёРЅРіСѓ")
         except Exception as e:
-            self.logger.error(f"Ошибка при обновлении состояния мониторинга: {str(e)}", exc_info=True)
-            self.error_handler.show_error_dialog(self, "Ошибка обновления интерфейса", 
-                                             "Не удалось обновить состояние интерфейса", str(e))
-
+            self.logger.error(f"РћС€РёР±РєР° РїСЂРё РѕР±РЅРѕРІР»РµРЅРёРё СЃРѕСЃС‚РѕСЏРЅРёСЏ РјРѕРЅРёС‚РѕСЂРёРЅРіР°: {str(e)}", exc_info=True)
+            self.error_handler.show_error_dialog(self, "РћС€РёР±РєР° РѕР±РЅРѕРІР»РµРЅРёСЏ РёРЅС‚РµСЂС„РµР№СЃР°", 
+                                             "РќРµ СѓРґР°Р»РѕСЃСЊ РѕР±РЅРѕРІРёС‚СЊ СЃРѕСЃС‚РѕСЏРЅРёРµ РёРЅС‚РµСЂС„РµР№СЃР°", str(e))
+    
     def toggle_monitoring(self):
-        """Включает или выключает мониторинг"""
+        """Р’РєР»СЋС‡Р°РµС‚ РёР»Рё РІС‹РєР»СЋС‡Р°РµС‚ РјРѕРЅРёС‚РѕСЂРёРЅРі"""
         try:
             if self.viewmodel.is_monitoring:
-                self.logger.info("Остановка мониторинга")
+                self.logger.info("РћСЃС‚Р°РЅРѕРІРєР° РјРѕРЅРёС‚РѕСЂРёРЅРіР°")
                 self.viewmodel.stop_monitoring()
                 return
-            # Получаем ID стрима из поля ввода
+            # РџРѕР»СѓС‡Р°РµРј ID СЃС‚СЂРёРјР° РёР· РїРѕР»СЏ РІРІРѕРґР°
             stream = self.stream_input.text().strip()
             if not stream:
-                self.logger.warning("Попытка начать мониторинг без указания ID стрима")
-                self.error_handler.show_validation_error(self, "Пожалуйста, укажите ID стрима")
+                self.logger.warning("РџРѕРїС‹С‚РєР° РЅР°С‡Р°С‚СЊ РјРѕРЅРёС‚РѕСЂРёРЅРі Р±РµР· СѓРєР°Р·Р°РЅРёСЏ ID СЃС‚СЂРёРјР°")
+                self.error_handler.show_validation_error(self, "РџРѕР¶Р°Р»СѓР№СЃС‚Р°, СѓРєР°Р¶РёС‚Рµ ID СЃС‚СЂРёРјР°")
                 return
-            # Обновляем ID стрима в модели и запускаем мониторинг
-            self.logger.info(f"Начало мониторинга стрима: {stream}")
+            # РћР±РЅРѕРІР»СЏРµРј ID СЃС‚СЂРёРјР° РІ РјРѕРґРµР»Рё Рё Р·Р°РїСѓСЃРєР°РµРј РјРѕРЅРёС‚РѕСЂРёРЅРі
+            self.logger.info(f"РќР°С‡Р°Р»Рѕ РјРѕРЅРёС‚РѕСЂРёРЅРіР° СЃС‚СЂРёРјР°: {stream}")
             self.viewmodel.stream = stream
             self.viewmodel.start_monitoring()
         except Exception as e:
-            self.logger.error(f"Ошибка при переключении мониторинга: {str(e)}", exc_info=True)
-            self.error_handler.show_error_dialog(self, "Ошибка мониторинга", 
-                                                 "Не удалось изменить состояние мониторинга", str(e))
-
+            self.logger.error(f"РћС€РёР±РєР° РїСЂРё РїРµСЂРµРєР»СЋС‡РµРЅРёРё РјРѕРЅРёС‚РѕСЂРёРЅРіР°: {str(e)}", exc_info=True)
+            self.error_handler.show_error_dialog(self, "РћС€РёР±РєР° РјРѕРЅРёС‚РѕСЂРёРЅРіР°", 
+                                                 "РќРµ СѓРґР°Р»РѕСЃСЊ РёР·РјРµРЅРёС‚СЊ СЃРѕСЃС‚РѕСЏРЅРёРµ РјРѕРЅРёС‚РѕСЂРёРЅРіР°", str(e))
+    
     def toggle_notify_gift(self):
-        """Включает или выключает звуковые оповещения о подарках"""
+        """Р’РєР»СЋС‡Р°РµС‚ РёР»Рё РІС‹РєР»СЋС‡Р°РµС‚ Р·РІСѓРєРѕРІС‹Рµ РѕРїРѕРІРµС‰РµРЅРёСЏ Рѕ РїРѕРґР°СЂРєР°С…"""
         try:
             self.viewmodel.notify_gift = self.notify_chk.isChecked()
-            self.logger.debug(f"Настройка звуковых оповещений изменена: {self.viewmodel.notify_gift}")
+            self.logger.debug(f"РќР°СЃС‚СЂРѕР№РєР° Р·РІСѓРєРѕРІС‹С… РѕРїРѕРІРµС‰РµРЅРёР№ РёР·РјРµРЅРµРЅР°: {self.viewmodel.notify_gift}")
         except Exception as e:
-            self.logger.error(f"Ошибка при изменении настройки звуковых оповещений: {str(e)}", exc_info=True)
-            self.error_handler.show_error_dialog(self, "Ошибка настроек", 
-                                                 "Не удалось изменить настройку звуковых оповещений", str(e))
-
+            self.logger.error(f"РћС€РёР±РєР° РїСЂРё РёР·РјРµРЅРµРЅРёРё РЅР°СЃС‚СЂРѕР№РєРё Р·РІСѓРєРѕРІС‹С… РѕРїРѕРІРµС‰РµРЅРёР№: {str(e)}", exc_info=True)
+            self.error_handler.show_error_dialog(self, "РћС€РёР±РєР° РЅР°СЃС‚СЂРѕРµРє", 
+                                                 "РќРµ СѓРґР°Р»РѕСЃСЊ РёР·РјРµРЅРёС‚СЊ РЅР°СЃС‚СЂРѕР№РєСѓ Р·РІСѓРєРѕРІС‹С… РѕРїРѕРІРµС‰РµРЅРёР№", str(e))
+    
     def toggle_speech_gift(self):
-        """Включает или выключает озвучивание подарков"""
+        """Р’РєР»СЋС‡Р°РµС‚ РёР»Рё РІС‹РєР»СЋС‡Р°РµС‚ РѕР·РІСѓС‡РёРІР°РЅРёРµ РїРѕРґР°СЂРєРѕРІ"""
         try:
             self.viewmodel.speech_gift = self.speech_gift_chk.isChecked()
-            self.logger.debug(f"Настройка озвучивания подарков изменена: {self.viewmodel.speech_gift}")
+            self.logger.debug(f"РќР°СЃС‚СЂРѕР№РєР° РѕР·РІСѓС‡РёРІР°РЅРёСЏ РїРѕРґР°СЂРєРѕРІ РёР·РјРµРЅРµРЅР°: {self.viewmodel.speech_gift}")
         except Exception as e:
-            self.logger.error(f"Ошибка при изменении настройки озвучивания подарков: {str(e)}", exc_info=True)
-            self.error_handler.show_error_dialog(self, "Ошибка настроек", 
-                                                 "Не удалось изменить настройку озвучивания подарков", str(e))
-
+            self.logger.error(f"РћС€РёР±РєР° РїСЂРё РёР·РјРµРЅРµРЅРёРё РЅР°СЃС‚СЂРѕР№РєРё РѕР·РІСѓС‡РёРІР°РЅРёСЏ РїРѕРґР°СЂРєРѕРІ: {str(e)}", exc_info=True)
+            self.error_handler.show_error_dialog(self, "РћС€РёР±РєР° РЅР°СЃС‚СЂРѕРµРє", 
+                                                 "РќРµ СѓРґР°Р»РѕСЃСЊ РёР·РјРµРЅРёС‚СЊ РЅР°СЃС‚СЂРѕР№РєСѓ РѕР·РІСѓС‡РёРІР°РЅРёСЏ РїРѕРґР°СЂРєРѕРІ", str(e))
+    
     def toggle_speech_like(self):
-        """Включает или выключает озвучивание лайков"""
+        """Р’РєР»СЋС‡Р°РµС‚ РёР»Рё РІС‹РєР»СЋС‡Р°РµС‚ РѕР·РІСѓС‡РёРІР°РЅРёРµ Р»Р°Р№РєРѕРІ"""
         try:
             self.viewmodel.speech_like = self.speech_like_chk.isChecked()
-            self.logger.debug(f"Настройка озвучивания лайков изменена: {self.viewmodel.speech_like}")
+            self.logger.debug(f"РќР°СЃС‚СЂРѕР№РєР° РѕР·РІСѓС‡РёРІР°РЅРёСЏ Р»Р°Р№РєРѕРІ РёР·РјРµРЅРµРЅР°: {self.viewmodel.speech_like}")
         except Exception as e:
-            self.logger.error(f"Ошибка при изменении настройки озвучивания лайков: {str(e)}", exc_info=True)
-            self.error_handler.show_error_dialog(self, "Ошибка настроек", 
-                                                 "Не удалось изменить настройку озвучивания лайков", str(e))
-
+            self.logger.error(f"РћС€РёР±РєР° РїСЂРё РёР·РјРµРЅРµРЅРёРё РЅР°СЃС‚СЂРѕР№РєРё РѕР·РІСѓС‡РёРІР°РЅРёСЏ Р»Р°Р№РєРѕРІ: {str(e)}", exc_info=True)
+            self.error_handler.show_error_dialog(self, "РћС€РёР±РєР° РЅР°СЃС‚СЂРѕРµРє", 
+                                                 "РќРµ СѓРґР°Р»РѕСЃСЊ РёР·РјРµРЅРёС‚СЊ РЅР°СЃС‚СЂРѕР№РєСѓ РѕР·РІСѓС‡РёРІР°РЅРёСЏ Р»Р°Р№РєРѕРІ", str(e))
+    
     def toggle_speech_member(self):
-        """Включает или выключает озвучивание подключений"""
+        """Р’РєР»СЋС‡Р°РµС‚ РёР»Рё РІС‹РєР»СЋС‡Р°РµС‚ РѕР·РІСѓС‡РёРІР°РЅРёРµ РїРѕРґРєР»СЋС‡РµРЅРёР№"""
         try:
             self.viewmodel.speech_member = self.speech_member_chk.isChecked()
-            self.logger.debug(f"Настройка озвучивания подключений изменена: {self.viewmodel.speech_member}")
+            self.logger.debug(f"РќР°СЃС‚СЂРѕР№РєР° РѕР·РІСѓС‡РёРІР°РЅРёСЏ РїРѕРґРєР»СЋС‡РµРЅРёР№ РёР·РјРµРЅРµРЅР°: {self.viewmodel.speech_member}")
         except Exception as e:
-            self.logger.error(f"Ошибка при изменении настройки озвучивания подключений: {str(e)}", exc_info=True)
-            self.error_handler.show_error_dialog(self, "Ошибка настроек", 
-                                                 "Не удалось изменить настройку озвучивания подключений", str(e))
+            self.logger.error(f"РћС€РёР±РєР° РїСЂРё РёР·РјРµРЅРµРЅРёРё РЅР°СЃС‚СЂРѕР№РєРё РѕР·РІСѓС‡РёРІР°РЅРёСЏ РїРѕРґРєР»СЋС‡РµРЅРёР№: {str(e)}", exc_info=True)
+            self.error_handler.show_error_dialog(self, "РћС€РёР±РєР° РЅР°СЃС‚СЂРѕРµРє", 
+                                                 "РќРµ СѓРґР°Р»РѕСЃСЊ РёР·РјРµРЅРёС‚СЊ РЅР°СЃС‚СЂРѕР№РєСѓ РѕР·РІСѓС‡РёРІР°РЅРёСЏ РїРѕРґРєР»СЋС‡РµРЅРёР№", str(e))
