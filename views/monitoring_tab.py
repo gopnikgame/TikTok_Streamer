@@ -1,12 +1,12 @@
 # views/monitoring_tab.py
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QLabel, QCheckBox, QTableView
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QModelIndex
 from models.data_models import AlertLevel, TableItemView, GiftData
 from utils.error_handler import ErrorHandler
 from utils.logger import Logger
 from PyQt6 import sip
 from datetime import datetime
-from .main_window import EventsTableModel
+from .events_table_model import EventsTableModel  # Импортируем EventsTableModel из отдельного файла
 
 class MonitoringTab(QWidget):
     def __init__(self, viewmodel, parent=None):
@@ -14,7 +14,7 @@ class MonitoringTab(QWidget):
         self.viewmodel = viewmodel
         self.error_handler = ErrorHandler()
         self.logger = Logger().get_logger('MonitoringTab')
-        self.logger.info("Инициализация вкладки мониторинга")
+        self.logger.info("Initializing the monitoring tab")
         self.init_ui()
         self.bind_events()
         self.update_monitoring_state()
