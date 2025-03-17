@@ -4,7 +4,7 @@ from models.data_models import TableItemView, AlertLevel
 from utils.settings import Settings
 from utils.logger import Logger
 from utils.error_handler import ErrorHandler
-from tiktok_connection import TikTokConnection
+from .tiktok_connection import TikTokConnection
 
 class MonitoringViewModel(QObject):
     status_changed = pyqtSignal(str)
