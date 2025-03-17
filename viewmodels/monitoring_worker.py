@@ -1,6 +1,6 @@
 # monitoring_worker.py
 import asyncio
-from TikTokLive import TikTokLiveClient, TikTokLiveClientConfig
+from TikTokLive import TikTokLiveClient
 from TikTokLive.events import GiftEvent, LikeEvent, JoinEvent, ConnectEvent, DisconnectEvent, SignatureRateLimitError
 from models.data_models import TableItemView, AlertLevel
 from utils.settings import Settings
@@ -65,12 +65,7 @@ class MonitoringWorker(QObject):
             retry_count = 0
             while retry_count < max_retries and not self._shutdown_requested:
                 try:
-                    config = TikTokLiveClientConfig(
-                        tiktok_sign_api_key="your-api-key",  # Используйте свой API Key
-                        web_proxy="http://your-proxy-url",  # Используйте прокси
-                        ws_proxy="http://your-proxy-url"     # Используйте прокси
-                    )
-                    self.client = TikTokLiveClient(self.stream, config=config)
+                    self.client = TikTokLiveClient(self.stream)
                     @self.client.on(ConnectEvent)
                     async def on_connect(event: ConnectEvent):
                         self.logger.info(f"Подключено к стриму {self.stream}")
