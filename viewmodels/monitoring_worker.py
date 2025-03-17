@@ -28,10 +28,10 @@ class MonitoringWorker(QObject):
         self.loop = None
         self.is_monitoring = False
         self.is_processing = False
-        self._shutdown_requested = False  # Новый флаг для отслеживания запроса на завершение
-        self.last_connect_time = None  # Флаг для отслеживания времени последнего подключения
-        self.update_interval = 0.5  # Интервал обновления данных в секундах
-        self.last_update_time = None  # Время последнего обновления
+        self._shutdown_requested = False
+        self.last_connect_time = None
+        self.update_interval = 5.0  # Интервал обновления данных в секундах
+        self.last_update_time = None
 
     def run(self):
         self.logger.debug("Запуск метода run в MonitoringWorker")
@@ -43,10 +43,11 @@ class MonitoringWorker(QObject):
             self.logger.debug("Работа была отменена")
         except Exception as e:
             self.logger.error(f"Ошибка в основном цикле: {str(e)}", exc_info=True)
-        # НЕ закрываем loop в finally, это должно происходить только через request_shutdown
 
     async def request_shutdown(self):
-        """Безопасный метод для запроса завершения работы"""
+        """
+        Безопасный метод для запроса завершения работы
+        """
         self.logger.debug("Получен запрос на завершение работы")
         self._shutdown_requested = True
         if self.client and self.client.connected:
@@ -66,6 +67,9 @@ class MonitoringWorker(QObject):
             self.loop = asyncio.get_event_loop()
             max_retries = 5
             retry_count = 0
+            retry_delay = 5  # начальная задержка в секундах
+            max_delay = 300  # максимальная задержка в секундах
+
             while retry_count < max_retries and not self._shutdown_requested:
                 try:
                     self.client = TikTokLiveClient(self.stream)
@@ -84,7 +88,7 @@ class MonitoringWorker(QObject):
                             )
                             self.item_added.emit(item)
                             self.status_changed.emit("Мониторинг активен")
-                            self.last_connect_time = current_time  # Обновляем время последнего подключения
+                            self.last_connect_time = current_time
                         else:
                             self.logger.warning(f"Игнорируем повторное событие подключения менее чем через 10 секунд")
 
@@ -119,10 +123,8 @@ class MonitoringWorker(QObject):
 
                     self.logger.info("Запуск клиента TikTok Live")
                     self.client_task = self.loop.create_task(self.client.start())
-                    # Основной цикл работы
                     while not self.client_task.done() and not self.client_task.cancelled() and not self._shutdown_requested:
-                        await asyncio.sleep(1)  # Уменьшаем интервал для более быстрой реакции на shutdown
-                        # Проверяем статус клиента во время выполнения
+                        await asyncio.sleep(1)
                         if not self.client.connected and not self._shutdown_requested:
                             self.logger.warning("Соединение с TikTok было разорвано")
                             break
@@ -142,8 +144,9 @@ class MonitoringWorker(QObject):
                     self.is_monitoring = False
                     self.is_processing = False
                     retry_count += 1
-                    self.logger.warning(f"Попытка переподключения ({retry_count}/{max_retries})")
-                    await asyncio.sleep(300)  # Пауза на 5 минут перед следующей попыткой
+                    delay = min(retry_delay * (2 ** retry_count), max_delay)
+                    self.logger.warning(f"Попытка переподключения ({retry_count}/{max_retries}) через {delay} секунд")
+                    await asyncio.sleep(delay)
         except asyncio.CancelledError:
             self.logger.debug("Асинхронная задача была отменена")
         except Exception as e:
@@ -159,25 +162,19 @@ class MonitoringWorker(QObject):
             self.is_monitoring = False
             self.is_processing = False
         finally:
-            # ⚠️ Аккуратно выполняем очистку без закрытия event loop
             self.logger.debug("Выполнение блока finally в методе _run_tiktok_client")
-            # Отключаем клиента, если он всё ещё подключен
             if self.client and self.client.connected:
                 try:
                     self.logger.debug("Закрытие клиента TikTok")
-                    # Используем wait_for с небольшим таймаутом, чтобы не блокировать завершение
                     await asyncio.wait_for(self.client.disconnect(), timeout=1.0)
                 except (asyncio.TimeoutError, Exception) as e:
                     self.logger.warning(f"Не удалось корректно закрыть клиент TikTok: {str(e)}")
-            # Очищаем ресурсы без закрытия loop
             if self.loop and self.loop.is_running():
                 try:
                     self.logger.debug("Очистка асинхронных генераторов")
-                    # Используем небольшой таймаут для shutdown_asyncgens
                     await asyncio.wait_for(self.loop.shutdown_asyncgens(), timeout=1.0)
                 except (asyncio.TimeoutError, Exception) as e:
                     self.logger.warning(f"Не удалось корректно закрыть асинхронные генераторы: {str(e)}")
-            # НЕ останавливаем и не закрываем loop здесь!
             self.logger.debug("Завершение метода _run_tiktok_client")
 
     async def _handle_event_with_throttle(self, event, event_type, alert_level):
@@ -190,7 +187,7 @@ class MonitoringWorker(QObject):
                 alert_level=alert_level
             )
             self.item_added.emit(item)
-            self.last_update_time = current_time  # Обновляем время последнего обновления
+            self.last_update_time = current_time
             if event_type == "донат":
                 tasks = []
                 if event.gift.streakable:
