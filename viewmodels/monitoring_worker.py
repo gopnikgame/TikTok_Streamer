@@ -29,6 +29,7 @@ class MonitoringWorker(QObject):
         self.is_monitoring = False
         self.is_processing = False
         self._shutdown_requested = False  # Новый флаг для отслеживания запроса на завершение
+        self.last_connect_time = None  # Флаг для отслеживания времени последнего подключения
 
     def run(self):
         self.logger.debug("Запуск метода run в MonitoringWorker")
@@ -79,6 +80,8 @@ class MonitoringWorker(QObject):
                         )
                         self.item_added.emit(item)
                         self.status_changed.emit("Мониторинг активен")
+                        self.last_connect_time = datetime.now()  # Обновляем время последнего подключения
+
                     @self.client.on(DisconnectEvent)
                     async def on_disconnect(event: DisconnectEvent):
                         self.logger.info(f"Отключено от стрима {self.stream}")
@@ -92,6 +95,7 @@ class MonitoringWorker(QObject):
                         )
                         self.item_added.emit(item)
                         self.status_changed.emit("Мониторинг остановлен")
+
                     @self.client.on(GiftEvent)
                     async def on_gift(event: GiftEvent):
                         self.logger.info(f"Получен подарок {event.gift.name} от {event.user.nickname}")
@@ -133,6 +137,7 @@ class MonitoringWorker(QObject):
                             await asyncio.gather(*tasks)
                         except Exception as e:
                             self.logger.error(f"Ошибка при обработке подарка: {str(e)}", exc_info=True)
+
                     @self.client.on(LikeEvent)
                     async def on_like(event: LikeEvent):
                         self.logger.debug(f"Получен лайк от {event.user.nickname}")
@@ -153,6 +158,7 @@ class MonitoringWorker(QObject):
                                 )
                         except Exception as e:
                             self.logger.error(f"Ошибка при обработке лайка: {str(e)}", exc_info=True)
+
                     @self.client.on(JoinEvent)
                     async def on_join(event: JoinEvent):
                         self.logger.debug(f"Новое подключение: {event.user.nickname}")
@@ -173,6 +179,7 @@ class MonitoringWorker(QObject):
                                 )
                         except Exception as e:
                             self.logger.error(f"Ошибка при обработке подключения: {str(e)}", exc_info=True)
+
                     self.logger.info("Запуск клиента TikTok Live")
                     self.client_task = self.loop.create_task(self.client.start())
                     # Основной цикл работы
