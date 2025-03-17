@@ -19,9 +19,11 @@ class MonitoringTab(QWidget):
         self.bind_events()
         self.update_monitoring_state()
         self.logger.debug("Вкладка мониторинга инициализирована")
-    
+
     def init_ui(self):
-        """Инициализирует пользовательский интерфейс вкладки мониторинга"""
+        """
+        Инициализирует пользовательский интерфейс вкладки мониторинга
+        """
         try:
             layout = QVBoxLayout()
             # Строка с полем для ID стрима и кнопкой запуска
@@ -65,10 +67,12 @@ class MonitoringTab(QWidget):
         except Exception as e:
             self.logger.error(f"Ошибка при создании вкладки мониторинга: {str(e)}", exc_info=True)
             self.error_handler.show_error_dialog(self, "Ошибка создания интерфейса", 
-                                              "Не удалось создать вкладку мониторинга", str(e))
-    
+                                                 "Не удалось создать вкладку мониторинга", str(e))
+
     def bind_events(self):
-        """Привязывает обработчики событий к изменениям ViewModel"""
+        """
+        Привязывает обработчики событий к изменениям ViewModel
+        """
         try:
             self.toggle_btn.clicked.connect(self.toggle_monitoring)
             self.notify_chk.clicked.connect(self.toggle_notify_gift)
@@ -81,10 +85,12 @@ class MonitoringTab(QWidget):
         except Exception as e:
             self.logger.error(f"Ошибка при привязке обработчиков событий: {str(e)}", exc_info=True)
             self.error_handler.show_error_dialog(self, "Ошибка инициализации", 
-                                             "Не удалось привязать обработчики событий", str(e))
-    
+                                                 "Не удалось привязать обработчики событий", str(e))
+
     def update_monitoring_state(self):
-        """Обновляет состояние интерфейса в зависимости от статуса мониторинга"""
+        """
+        Обновляет состояние интерфейса в зависимости от статуса мониторинга
+        """
         try:
             if self.viewmodel.is_processing:
                 self.toggle_btn.setEnabled(False)
@@ -106,10 +112,12 @@ class MonitoringTab(QWidget):
         except Exception as e:
             self.logger.error(f"Ошибка при обновлении состояния мониторинга: {str(e)}", exc_info=True)
             self.error_handler.show_error_dialog(self, "Ошибка обновления интерфейса", 
-                                             "Не удалось обновить состояние интерфейса", str(e))
-    
+                                                 "Не удалось обновить состояние интерфейса", str(e))
+
     def update_status_label(self, status):
-        """Обновляет текст статуса"""
+        """
+        Обновляет текст статуса
+        """
         try:
             self.status_label.setText(f"Статус: {status}")
             self.logger.debug(f"Статус обновлен: {status}")
@@ -117,9 +125,11 @@ class MonitoringTab(QWidget):
             self.logger.error(f"Ошибка при обновлении статуса: {str(e)}", exc_info=True)
             self.error_handler.show_error_dialog(self, "Ошибка обновления статуса", 
                                                  "Не удалось обновить статус", str(e))
-    
+
     def toggle_monitoring(self):
-        """Включает или выключает мониторинг"""
+        """
+        Включает или выключает мониторинг
+        """
         try:
             if self.viewmodel.is_monitoring:
                 self.logger.info("Остановка мониторинга")
@@ -139,9 +149,11 @@ class MonitoringTab(QWidget):
             self.logger.error(f"Ошибка при переключении мониторинга: {str(e)}", exc_info=True)
             self.error_handler.show_error_dialog(self, "Ошибка мониторинга", 
                                                  "Не удалось изменить состояние мониторинга", str(e))
-    
+
     def toggle_notify_gift(self):
-        """Включает или выключает звуковые оповещения о подарках"""
+        """
+        Включает или выключает звуковые оповещения о подарках
+        """
         try:
             self.viewmodel.notify_gift = self.notify_chk.isChecked()
             self.logger.debug(f"Настройка звуковых оповещений изменена: {self.viewmodel.notify_gift}")
@@ -149,9 +161,11 @@ class MonitoringTab(QWidget):
             self.logger.error(f"Ошибка при изменении настройки звуковых оповещений: {str(e)}", exc_info=True)
             self.error_handler.show_error_dialog(self, "Ошибка настроек", 
                                                  "Не удалось изменить настройку звуковых оповещений", str(e))
-    
+
     def toggle_speech_gift(self):
-        """Включает или выключает озвучивание подарков"""
+        """
+        Включает или выключает озвучивание подарков
+        """
         try:
             self.viewmodel.speech_gift = self.speech_gift_chk.isChecked()
             self.logger.debug(f"Настройка озвучивания подарков изменена: {self.viewmodel.speech_gift}")
@@ -159,9 +173,11 @@ class MonitoringTab(QWidget):
             self.logger.error(f"Ошибка при изменении настройки озвучивания подарков: {str(e)}", exc_info=True)
             self.error_handler.show_error_dialog(self, "Ошибка настроек", 
                                                  "Не удалось изменить настройку озвучивания подарков", str(e))
-    
+
     def toggle_speech_like(self):
-        """Включает или выключает озвучивание лайков"""
+        """
+        Включает или выключает озвучивание лайков
+        """
         try:
             self.viewmodel.speech_like = self.speech_like_chk.isChecked()
             self.logger.debug(f"Настройка озвучивания лайков изменена: {self.viewmodel.speech_like}")
@@ -169,9 +185,11 @@ class MonitoringTab(QWidget):
             self.logger.error(f"Ошибка при изменении настройки озвучивания лайков: {str(e)}", exc_info=True)
             self.error_handler.show_error_dialog(self, "Ошибка настроек", 
                                                  "Не удалось изменить настройку озвучивания лайков", str(e))
-    
+
     def toggle_speech_member(self):
-        """Включает или выключает озвучивание подключений"""
+        """
+        Включает или выключает озвучивание подключений
+        """
         try:
             self.viewmodel.speech_member = self.speech_member_chk.isChecked()
             self.logger.debug(f"Настройка озвучивания подключений изменена: {self.viewmodel.speech_member}")
