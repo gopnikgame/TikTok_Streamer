@@ -1,4 +1,3 @@
-# views/settings_tab.py
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QLabel, QCheckBox, QComboBox, QSlider, QSpinBox, QMessageBox
 from PyQt6.QtCore import Qt
 from models.data_models import AlertLevel, TableItemView, GiftData
@@ -14,197 +13,197 @@ class SettingsTab(QWidget):
         self.viewmodel = viewmodel
         self.error_handler = ErrorHandler()
         self.logger = Logger().get_logger('SettingsTab')
-        self.logger.info("Инициализация вкладки настроек")
+        self.logger.info("РРЅРёС†РёР°Р»РёР·Р°С†РёСЏ РІРєР»Р°РґРєРё РЅР°СЃС‚СЂРѕРµРє")
         self.init_ui()
         self.bind_events()
-        self.logger.debug("Вкладка настроек инициализирована")
+        self.logger.debug("Р’РєР»Р°РґРєР° РЅР°СЃС‚СЂРѕРµРє РёРЅРёС†РёР°Р»РёР·РёСЂРѕРІР°РЅР°")
 
     def init_ui(self):
-        """Инициализирует пользовательский интерфейс вкладки настроек"""
+        """РРЅРёС†РёР°Р»РёР·РёСЂСѓРµС‚ РїРѕР»СЊР·РѕРІР°С‚РµР»СЊСЃРєРёР№ РёРЅС‚РµСЂС„РµР№СЃ РІРєР»Р°РґРєРё РЅР°СЃС‚СЂРѕРµРє"""
         try:
             layout = QVBoxLayout()
-            # Голос
+            # Р“РѕР»РѕСЃ
             voice_layout = QHBoxLayout()
-            voice_layout.addWidget(QLabel("Голос:"))
+            voice_layout.addWidget(QLabel("Р“РѕР»РѕСЃ:"))
             self.voice_combo = QComboBox()
             try:
-                # Получаем список доступных голосов
+                # РџРѕР»СѓС‡Р°РµРј СЃРїРёСЃРѕРє РґРѕСЃС‚СѓРїРЅС‹С… РіРѕР»РѕСЃРѕРІ
                 voices = self.viewmodel.speech_service.get_voices()
-                self.voice_combo.addItem("") # Пустой вариант для значения по умолчанию
+                self.voice_combo.addItem("") # РџСѓСЃС‚РѕР№ РІР°СЂРёР°РЅС‚ РґР»СЏ Р·РЅР°С‡РµРЅРёСЏ РїРѕ СѓРјРѕР»С‡Р°РЅРёСЋ
                 self.voice_combo.addItems(voices)
-                # Устанавливаем текущий голос, если он задан
+                # РЈСЃС‚Р°РЅР°РІР»РёРІР°РµРј С‚РµРєСѓС‰РёР№ РіРѕР»РѕСЃ, РµСЃР»Рё РѕРЅ Р·Р°РґР°РЅ
                 current_voice = self.viewmodel.settings.speech_voice
                 if current_voice and current_voice in voices:
                     self.voice_combo.setCurrentText(current_voice)
             except Exception as e:
-                self.logger.error(f"Ошибка получения списка голосов: {str(e)}", exc_info=True)
+                self.logger.error(f"РћС€РёР±РєР° РїРѕР»СѓС‡РµРЅРёСЏ СЃРїРёСЃРєР° РіРѕР»РѕСЃРѕРІ: {str(e)}", exc_info=True)
                 self.error_handler.handle_file_error(self, e, "voices")
             voice_layout.addWidget(self.voice_combo, 1)
             layout.addLayout(voice_layout)
-            self.logger.debug("Создана строка для выбора голоса")
-            # Скорость речи
+            self.logger.debug("РЎРѕР·РґР°РЅР° СЃС‚СЂРѕРєР° РґР»СЏ РІС‹Р±РѕСЂР° РіРѕР»РѕСЃР°")
+            # РЎРєРѕСЂРѕСЃС‚СЊ СЂРµС‡Рё
             rate_layout = QHBoxLayout()
-            rate_layout.addWidget(QLabel("Скорость речи:"))
+            rate_layout.addWidget(QLabel("РЎРєРѕСЂРѕСЃС‚СЊ СЂРµС‡Рё:"))
             self.rate_slider = QSlider(Qt.Orientation.Horizontal)
             self.rate_slider.setRange(-10, 10)
             self.rate_slider.setValue(self.viewmodel.settings.speech_rate)
             rate_layout.addWidget(self.rate_slider, 1)
             layout.addLayout(rate_layout)
-            self.logger.debug("Создана строка для скорости речи")
-            # Громкость речи
+            self.logger.debug("РЎРѕР·РґР°РЅР° СЃС‚СЂРѕРєР° РґР»СЏ СЃРєРѕСЂРѕСЃС‚Рё СЂРµС‡Рё")
+            # Р“СЂРѕРјРєРѕСЃС‚СЊ СЂРµС‡Рё
             volume_layout = QHBoxLayout()
-            volume_layout.addWidget(QLabel("Громкость речи:"))
+            volume_layout.addWidget(QLabel("Р“СЂРѕРјРєРѕСЃС‚СЊ СЂРµС‡Рё:"))
             self.volume_slider = QSlider(Qt.Orientation.Horizontal)
-            self.volume_slider.setRange(0, 100)  # Диапазон 0-100 для удобства пользователя
-            self.volume_slider.setValue(int(self.viewmodel.settings.speech_volume * 100))  # Преобразуем из 0.0-1.0 в 0-100
+            self.volume_slider.setRange(0, 100)  # Р”РёР°РїР°Р·РѕРЅ 0-100 РґР»СЏ СѓРґРѕР±СЃС‚РІР° РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ
+            self.volume_slider.setValue(int(self.viewmodel.settings.speech_volume * 100))  # РџСЂРµРѕР±СЂР°Р·СѓРµРј РёР· 0.0-1.0 РІ 0-100
             volume_layout.addWidget(self.volume_slider, 1)
             layout.addLayout(volume_layout)
-            self.logger.debug("Создана строка для громкости речи")
-            # Текст для подключения
+            self.logger.debug("РЎРѕР·РґР°РЅР° СЃС‚СЂРѕРєР° РґР»СЏ РіСЂРѕРјРєРѕСЃС‚Рё СЂРµС‡Рё")
+            # РўРµРєСЃС‚ РґР»СЏ РїРѕРґРєР»СЋС‡РµРЅРёСЏ
             join_layout = QHBoxLayout()
-            join_layout.addWidget(QLabel("Текст для подключения:"))
+            join_layout.addWidget(QLabel("РўРµРєСЃС‚ РґР»СЏ РїРѕРґРєР»СЋС‡РµРЅРёСЏ:"))
             self.join_text_input = QLineEdit()
             self.join_text_input.setText(self.viewmodel.settings.join_text)
             join_layout.addWidget(self.join_text_input, 1)
             layout.addLayout(join_layout)
-            self.logger.debug("Создана строка для текста подключения")
-            # Текст для лайка
+            self.logger.debug("РЎРѕР·РґР°РЅР° СЃС‚СЂРѕРєР° РґР»СЏ С‚РµРєСЃС‚Р° РїРѕРґРєР»СЋС‡РµРЅРёСЏ")
+            # РўРµРєСЃС‚ РґР»СЏ Р»Р°Р№РєР°
             like_layout = QHBoxLayout()
-            like_layout.addWidget(QLabel("Текст для лайка:"))
+            like_layout.addWidget(QLabel("РўРµРєСЃС‚ РґР»СЏ Р»Р°Р№РєР°:"))
             self.like_text_input = QLineEdit()
             self.like_text_input.setText(self.viewmodel.settings.like_text)
             like_layout.addWidget(self.like_text_input, 1)
             layout.addLayout(like_layout)
-            self.logger.debug("Создана строка для текста лайка")
-            # Задержка звуковых уведомлений
+            self.logger.debug("РЎРѕР·РґР°РЅР° СЃС‚СЂРѕРєР° РґР»СЏ С‚РµРєСЃС‚Р° Р»Р°Р№РєР°")
+            # Р—Р°РґРµСЂР¶РєР° Р·РІСѓРєРѕРІС‹С… СѓРІРµРґРѕРјР»РµРЅРёР№
             delay_layout = QHBoxLayout()
-            delay_layout.addWidget(QLabel("Задержка между звуковыми уведомлениями (мс):"))
+            delay_layout.addWidget(QLabel("Р—Р°РґРµСЂР¶РєР° РјРµР¶РґСѓ Р·РІСѓРєРѕРІС‹РјРё СѓРІРµРґРѕРјР»РµРЅРёСЏРјРё (РјСЃ):"))
             self.delay_input = QSpinBox()
             self.delay_input.setRange(0, 10000)
             self.delay_input.setSingleStep(100)
             self.delay_input.setValue(self.viewmodel.settings.notify_delay)
             delay_layout.addWidget(self.delay_input, 1)
             layout.addLayout(delay_layout)
-            self.logger.debug("Создана строка для задержки звуковых уведомлений")
-            # Уровень логирования
+            self.logger.debug("РЎРѕР·РґР°РЅР° СЃС‚СЂРѕРєР° РґР»СЏ Р·Р°РґРµСЂР¶РєРё Р·РІСѓРєРѕРІС‹С… СѓРІРµРґРѕРјР»РµРЅРёР№")
+            # РЈСЂРѕРІРµРЅСЊ Р»РѕРіРёСЂРѕРІР°РЅРёСЏ
             log_level_layout = QHBoxLayout()
-            log_level_layout.addWidget(QLabel("Уровень логирования:"))
+            log_level_layout.addWidget(QLabel("РЈСЂРѕРІРµРЅСЊ Р»РѕРіРёСЂРѕРІР°РЅРёСЏ:"))
             self.log_level_combo = QComboBox()
             self.log_level_combo.addItems(["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"])
             self.log_level_combo.setCurrentText(self.viewmodel.settings.logging_level)
             log_level_layout.addWidget(self.log_level_combo, 1)
             layout.addLayout(log_level_layout)
-            self.logger.debug("Создана строка для уровня логирования")
-            # Сохранение TikTok ID
+            self.logger.debug("РЎРѕР·РґР°РЅР° СЃС‚СЂРѕРєР° РґР»СЏ СѓСЂРѕРІРЅСЏ Р»РѕРіРёСЂРѕРІР°РЅРёСЏ")
+            # РЎРѕС…СЂР°РЅРµРЅРёРµ TikTok ID
             user_id_layout = QHBoxLayout()
-            user_id_layout.addWidget(QLabel("ID стрима:"))
+            user_id_layout.addWidget(QLabel("ID СЃС‚СЂРёРјР°:"))
             self.user_id_combo = QComboBox()
             self.user_id_combo.addItems(self.viewmodel.settings.saved_user_ids)
             self.user_id_combo.setEditable(True)
             self.user_id_combo.setCurrentText(self.viewmodel.stream)
             user_id_layout.addWidget(self.user_id_combo, 1)
             layout.addLayout(user_id_layout)
-            self.logger.debug("Создана строка для выбора/ввода ID стрима")
-            # Кнопка сохранения
-            save_btn = QPushButton("Сохранить настройки")
+            self.logger.debug("РЎРѕР·РґР°РЅР° СЃС‚СЂРѕРєР° РґР»СЏ РІС‹Р±РѕСЂР°/РІРІРѕРґР° ID СЃС‚СЂРёРјР°")
+            # РљРЅРѕРїРєР° СЃРѕС…СЂР°РЅРµРЅРёСЏ
+            save_btn = QPushButton("РЎРѕС…СЂР°РЅРёС‚СЊ РЅР°СЃС‚СЂРѕР№РєРё")
             save_btn.clicked.connect(self.save_settings)
             layout.addWidget(save_btn)
             layout.addStretch(1)
             self.setLayout(layout)
         except Exception as e:
-            self.logger.error(f"Ошибка при создании вкладки настроек: {str(e)}", exc_info=True)
-            self.error_handler.show_error_dialog(self, "Ошибка создания интерфейса", 
-                                              "Не удалось создать вкладку настроек", str(e))
+            self.logger.error(f"РћС€РёР±РєР° РїСЂРё СЃРѕР·РґР°РЅРёРё РІРєР»Р°РґРєРё РЅР°СЃС‚СЂРѕРµРє: {str(e)}", exc_info=True)
+            self.error_handler.show_error_dialog(self, "РћС€РёР±РєР° СЃРѕР·РґР°РЅРёСЏ РёРЅС‚РµСЂС„РµР№СЃР°", 
+                                              "РќРµ СѓРґР°Р»РѕСЃСЊ СЃРѕР·РґР°С‚СЊ РІРєР»Р°РґРєСѓ РЅР°СЃС‚СЂРѕРµРє", str(e))
 
     def bind_events(self):
-        """Привязывает обработчики событий к изменениям ViewModel"""
+        """РџСЂРёРІСЏР·С‹РІР°РµС‚ РѕР±СЂР°Р±РѕС‚С‡РёРєРё СЃРѕР±С‹С‚РёР№ Рє РёР·РјРµРЅРµРЅРёСЏРј ViewModel"""
         try:
             self.log_level_combo.currentIndexChanged.connect(self.update_logging_level)
             self.user_id_combo.currentIndexChanged.connect(self.update_user_id)
             self.rate_slider.valueChanged.connect(self.update_speech_rate)
             self.volume_slider.valueChanged.connect(self.update_speech_volume)
-            self.logger.debug("Обработчики событий привязаны")
+            self.logger.debug("РћР±СЂР°Р±РѕС‚С‡РёРєРё СЃРѕР±С‹С‚РёР№ РїСЂРёРІСЏР·Р°РЅС‹")
         except Exception as e:
-            self.logger.error(f"Ошибка при привязке обработчиков событий: {str(e)}", exc_info=True)
-            self.error_handler.show_error_dialog(self, "Ошибка инициализации", 
-                                             "Не удалось привязать обработчики событий", str(e))
+            self.logger.error(f"РћС€РёР±РєР° РїСЂРё РїСЂРёРІСЏР·РєРµ РѕР±СЂР°Р±РѕС‚С‡РёРєРѕРІ СЃРѕР±С‹С‚РёР№: {str(e)}", exc_info=True)
+            self.error_handler.show_error_dialog(self, "РћС€РёР±РєР° РёРЅРёС†РёР°Р»РёР·Р°С†РёРё", 
+                                             "РќРµ СѓРґР°Р»РѕСЃСЊ РїСЂРёРІСЏР·Р°С‚СЊ РѕР±СЂР°Р±РѕС‚С‡РёРєРё СЃРѕР±С‹С‚РёР№", str(e))
 
     def update_logging_level(self, index):
-        """Обновляет уровень логирования"""
+        """РћР±РЅРѕРІР»СЏРµС‚ СѓСЂРѕРІРµРЅСЊ Р»РѕРіРёСЂРѕРІР°РЅРёСЏ"""
         try:
             new_level = self.log_level_combo.currentText()
             self.viewmodel.settings.logging_level = new_level
             self.logger.setLevel(new_level)
-            self.logger.debug(f"Уровень логирования изменен: {new_level}")
+            self.logger.debug(f"РЈСЂРѕРІРµРЅСЊ Р»РѕРіРёСЂРѕРІР°РЅРёСЏ РёР·РјРµРЅРµРЅ: {new_level}")
         except Exception as e:
-            self.logger.error(f"Ошибка при изменении уровня логирования: {str(e)}", exc_info=True)
-            self.error_handler.show_error_dialog(self, "Ошибка настроек", 
-                                                "Не удалось изменить уровень логирования", str(e))
+            self.logger.error(f"РћС€РёР±РєР° РїСЂРё РёР·РјРµРЅРµРЅРёРё СѓСЂРѕРІРЅСЏ Р»РѕРіРёСЂРѕРІР°РЅРёСЏ: {str(e)}", exc_info=True)
+            self.error_handler.show_error_dialog(self, "РћС€РёР±РєР° РЅР°СЃС‚СЂРѕРµРє", 
+                                                 "РќРµ СѓРґР°Р»РѕСЃСЊ РёР·РјРµРЅРёС‚СЊ СѓСЂРѕРІРµРЅСЊ Р»РѕРіРёСЂРѕРІР°РЅРёСЏ", str(e))
 
     def update_user_id(self, index):
-        """Обновляет выбранный TikTok ID"""
+        """РћР±РЅРѕРІР»СЏРµС‚ РІС‹Р±СЂР°РЅРЅС‹Р№ TikTok ID"""
         try:
             new_user_id = self.user_id_combo.currentText()
             if new_user_id not in self.viewmodel.settings.saved_user_ids:
                 self.viewmodel.settings.saved_user_ids.append(new_user_id)
-                asyncio.run(self.viewmodel.settings.save())  # Сохраняем новые ID стрима
+                asyncio.run(self.viewmodel.settings.save())  # РЎРѕС…СЂР°РЅСЏРµРј РЅРѕРІС‹Рµ ID СЃС‚СЂРёРјР°
             self.viewmodel.stream = new_user_id
-            self.logger.debug(f"TikTok ID изменен: {new_user_id}")
+            self.logger.debug(f"TikTok ID РёР·РјРµРЅРµРЅ: {new_user_id}")
         except Exception as e:
-            self.logger.error(f"Ошибка при изменении TikTok ID: {str(e)}", exc_info=True)
-            self.error_handler.show_error_dialog(self, "Ошибка настроек", 
-                                                "Не удалось изменить TikTok ID", str(e))
+            self.logger.error(f"РћС€РёР±РєР° РїСЂРё РёР·РјРµРЅРµРЅРёРё TikTok ID: {str(e)}", exc_info=True)
+            self.error_handler.show_error_dialog(self, "РћС€РёР±РєР° РЅР°СЃС‚СЂРѕРµРє", 
+                                                 "РќРµ СѓРґР°Р»РѕСЃСЊ РёР·РјРµРЅРёС‚СЊ TikTok ID", str(e))
 
     def update_speech_rate(self, value):
-        """Обновляет скорость речи"""
+        """РћР±РЅРѕРІР»СЏРµС‚ СЃРєРѕСЂРѕСЃС‚СЊ СЂРµС‡Рё"""
         try:
             self.viewmodel.settings.speech_rate = value
-            self.logger.debug(f"Скорость речи изменена: {value}")
+            self.logger.debug(f"РЎРєРѕСЂРѕСЃС‚СЊ СЂРµС‡Рё РёР·РјРµРЅРµРЅР°: {value}")
         except Exception as e:
-            self.logger.error(f"Ошибка при изменении скорости речи: {str(e)}", exc_info=True)
-            self.error_handler.show_error_dialog(self, "Ошибка настроек", 
-                                                 "Не удалось изменить скорость речи", str(e))
+            self.logger.error(f"РћС€РёР±РєР° РїСЂРё РёР·РјРµРЅРµРЅРёРё СЃРєРѕСЂРѕСЃС‚Рё СЂРµС‡Рё: {str(e)}", exc_info=True)
+            self.error_handler.show_error_dialog(self, "РћС€РёР±РєР° РЅР°СЃС‚СЂРѕРµРє", 
+                                                 "РќРµ СѓРґР°Р»РѕСЃСЊ РёР·РјРµРЅРёС‚СЊ СЃРєРѕСЂРѕСЃС‚СЊ СЂРµС‡Рё", str(e))
 
     def update_speech_volume(self, value):
-        """Обновляет громкость речи"""
+        """РћР±РЅРѕРІР»СЏРµС‚ РіСЂРѕРјРєРѕСЃС‚СЊ СЂРµС‡Рё"""
         try:
-            volume = value / 100.0  # Преобразуем из 0-100 в 0.0-1.0
+            volume = value / 100.0  # РџСЂРµРѕР±СЂР°Р·СѓРµРј РёР· 0-100 РІ 0.0-1.0
             self.viewmodel.settings.speech_volume = volume
             self.viewmodel.speech_service.set_volume(volume)
-            self.logger.debug(f"Громкость речи изменена: {volume}")
+            self.logger.debug(f"Р“СЂРѕРјРєРѕСЃС‚СЊ СЂРµС‡Рё РёР·РјРµРЅРµРЅР°: {volume}")
         except Exception as e:
-            self.logger.error(f"Ошибка при изменении громкости речи: {str(e)}", exc_info=True)
-            self.error_handler.show_error_dialog(self, "Ошибка настроек", 
-                                                 "Не удалось изменить громкость речи", str(e))
+            self.logger.error(f"РћС€РёР±РєР° РїСЂРё РёР·РјРµРЅРµРЅРёРё РіСЂРѕРјРєРѕСЃС‚Рё СЂРµС‡Рё: {str(e)}", exc_info=True)
+            self.error_handler.show_error_dialog(self, "РћС€РёР±РєР° РЅР°СЃС‚СЂРѕРµРє", 
+                                                 "РќРµ СѓРґР°Р»РѕСЃСЊ РёР·РјРµРЅРёС‚СЊ РіСЂРѕРјРєРѕСЃС‚СЊ СЂРµС‡Рё", str(e))
 
     def save_settings(self):
-        """Сохраняет настройки"""
+        """РЎРѕС…СЂР°РЅСЏРµС‚ РЅР°СЃС‚СЂРѕР№РєРё"""
         try:
-            # Валидация данных
+            # Р’Р°Р»РёРґР°С†РёСЏ РґР°РЅРЅС‹С…
             if self.join_text_input.text().strip() == "":
-                self.error_handler.show_validation_error(self, "Текст для подключения не может быть пустым")
+                self.error_handler.show_validation_error(self, "РўРµРєСЃС‚ РґР»СЏ РїРѕРґРєР»СЋС‡РµРЅРёСЏ РЅРµ РјРѕР¶РµС‚ Р±С‹С‚СЊ РїСѓСЃС‚С‹Рј")
                 return
             if self.like_text_input.text().strip() == "":
-                self.error_handler.show_validation_error(self, "Текст для лайка не может быть пустым")
+                self.error_handler.show_validation_error(self, "РўРµРєСЃС‚ РґР»СЏ Р»Р°Р№РєР° РЅРµ РјРѕР¶РµС‚ Р±С‹С‚СЊ РїСѓСЃС‚С‹Рј")
                 return
-            # Голос
+            # Р“РѕР»РѕСЃ
             selected_voice = self.voice_combo.currentText()
             if selected_voice:
                 self.viewmodel.settings.speech_voice = selected_voice
-            # Скорость речи
+            # РЎРєРѕСЂРѕСЃС‚СЊ СЂРµС‡Рё
             self.viewmodel.settings.speech_rate = self.rate_slider.value()
-            # Громкость речи
+            # Р“СЂРѕРјРєРѕСЃС‚СЊ СЂРµС‡Рё
             self.viewmodel.settings.speech_volume = self.volume_slider.value() / 100.0
-            # Тексты
+            # РўРµРєСЃС‚С‹
             self.viewmodel.settings.join_text = self.join_text_input.text()
             self.viewmodel.settings.like_text = self.like_text_input.text()
-            # Задержка звуковых уведомлений
+            # Р—Р°РґРµСЂР¶РєР° Р·РІСѓРєРѕРІС‹С… СѓРІРµРґРѕРјР»РµРЅРёР№
             self.viewmodel.settings.notify_delay = self.delay_input.value()
-            # Сохраняем настройки
+            # РЎРѕС…СЂР°РЅСЏРµРј РЅР°СЃС‚СЂРѕР№РєРё
             asyncio.run(self.viewmodel.settings.save())
-            self.logger.info("Настройки успешно сохранены")
-            QMessageBox.information(self, "Настройки", "Настройки успешно сохранены")
+            self.logger.info("РќР°СЃС‚СЂРѕР№РєРё СѓСЃРїРµС€РЅРѕ СЃРѕС…СЂР°РЅРµРЅС‹")
+            QMessageBox.information(self, "РќР°СЃС‚СЂРѕР№РєРё", "РќР°СЃС‚СЂРѕР№РєРё СѓСЃРїРµС€РЅРѕ СЃРѕС…СЂР°РЅРµРЅС‹")
         except Exception as e:
-            self.logger.error(f"Ошибка при сохранении настроек: {str(e)}", exc_info=True)
-            self.error_handler.show_error_dialog(self, "Ошибка сохранения настроек", 
-                                                 "Не удалось сохранить настройки", str(e))
+            self.logger.error(f"РћС€РёР±РєР° РїСЂРё СЃРѕС…СЂР°РЅРµРЅРёРё РЅР°СЃС‚СЂРѕРµРє: {str(e)}", exc_info=True)
+            self.error_handler.show_error_dialog(self, "РћС€РёР±РєР° СЃРѕС…СЂР°РЅРµРЅРёСЏ РЅР°СЃС‚СЂРѕРµРє", 
+                                                 "РќРµ СѓРґР°Р»РѕСЃСЊ СЃРѕС…СЂР°РЅРёС‚СЊ РЅР°СЃС‚СЂРѕР№РєРё", str(e))
