@@ -14,10 +14,10 @@ from services.sound_service import SoundService
 from utils.settings import Settings
 from viewmodels.monitoring_viewmodel import MonitoringViewModel
 from datetime import datetime
-from .monitoring_tab import MonitoringTab
-from .settings_tab import SettingsTab
-from .sounds_tab import SoundsTab
-from .events_table_model import EventsTableModel  # Импортируем EventsTableModel из отдельного файла
+from views.monitoring_tab import MonitoringTab
+from views.settings_tab import SettingsTab
+from views.sounds_tab import SoundsTab
+from views.events_table_model import EventsTableModel  # Импортируем EventsTableModel из отдельного файла
 
 class MainWindow(QMainWindow):
     def __init__(self, viewmodel):
@@ -100,7 +100,7 @@ class MainWindow(QMainWindow):
                 self.table_model.layoutChanged.emit()
                 self.logger.debug("Таблица событий обновлена")
         except Exception as e:
-            self.logger.error(f"Ошибка при обновлении таблицы событий: {str(e)}")
+            self.logger.error(f"Ошибка при обновлении таблицы событий: {str(e)}", exc_info=True)
             try:
                 self.error_handler.handle_update_error(None, e)
             except Exception as inner_e:
@@ -312,6 +312,9 @@ class MainWindow(QMainWindow):
             self.monitoring_tab.status_label.setText(f"Статус: {status}")
             self.logger.info(f"Статус обновлен: {status}")
         except Exception as e:
+            self.logger.error(f"Ошибка при обновлении статуса: {str(e)}", exc_info=True)
+            self.error_handler.show_error_dialog(self, "Ошибка обновления статуса", 
+                                                 "Не удалось обновить статус", str(e))
             self.logger.error(f"Ошибка при обновлении статуса: {str(e)}", exc_info=True)
             self.error_handler.show_error_dialog(self, "Ошибка обновления статуса", 
                                                  "Не удалось обновить статус", str(e))
