@@ -2,7 +2,6 @@
 import asyncio
 from TikTokLive import TikTokLiveClient
 from TikTokLive.events import GiftEvent, LikeEvent, JoinEvent, ConnectEvent, DisconnectEvent
-from TikTokLive.client.errors import SignatureRateLimitError
 from models.data_models import TableItemView, AlertLevel
 from utils.settings import Settings
 from utils.logger import Logger
@@ -179,24 +178,10 @@ class MonitoringWorker(QObject):
                     # Основной цикл работы
                     while not self.client_task.done() and not self.client_task.cancelled() and not self._shutdown_requested:
                         await asyncio.sleep(1)  # Уменьшаем интервал для более быстрой реакции на shutdown
+                        # Проверяем статус клиента во время выполнения
                         if not self.client.connected and not self._shutdown_requested:
                             self.logger.warning("Соединение с TikTok было разорвано")
                             break
-                except SignatureRateLimitError as e:
-                    self.logger.error(f"Превышение лимита запросов: {str(e)}", exc_info=True)
-                    item = TableItemView(
-                        timestamp=datetime.now(),
-                        name="Система",
-                        event=f"Превышение лимита запросов: {str(e)}",
-                        alert_level=AlertLevel.IMPORTANT
-                    )
-                    self.item_added.emit(item)
-                    self.error_handler.handle_tiktok_error(None, e)
-                    self.is_monitoring = False
-                    self.is_processing = False
-                    retry_count += 1
-                    self.logger.warning(f"Попытка переподключения ({retry_count}/{max_retries})")
-                    await asyncio.sleep(60)  # Пауза на 1 минуту перед следующей попыткой
                 except asyncio.CancelledError:
                     self.logger.debug("Асинхронная задача была отменена")
                     break
@@ -214,7 +199,7 @@ class MonitoringWorker(QObject):
                     self.is_processing = False
                     retry_count += 1
                     self.logger.warning(f"Попытка переподключения ({retry_count}/{max_retries})")
-                    await asyncio.sleep(10)  # Пауза перед следующей попыткой
+                    await asyncio.sleep(300)  # Пауза на 5 минут перед следующей попыткой
         except asyncio.CancelledError:
             self.logger.debug("Асинхронная задача была отменена")
         except Exception as e:
