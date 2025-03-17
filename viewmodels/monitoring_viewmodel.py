@@ -174,7 +174,6 @@ class MonitoringViewModel(QObject):
         """Останавливает мониторинг стрима"""
         if self.worker and self.thread and self.thread.isRunning():
             self.logger.info("Остановка мониторинга стрима")
-            
             # Этап 1: Безопасное отключение через request_shutdown
             try:
                 if self.worker.loop and self.worker.client:
@@ -193,23 +192,19 @@ class MonitoringViewModel(QObject):
             except Exception as e:
                 self.logger.error(f"Ошибка при остановке клиента: {str(e)}")
                 self.error_handler.handle_tiktok_error(None, e)
-                
             # Этап 2: Корректное завершение потока
             try:
                 # Сначала пробуем gracefully
                 self.thread.quit()
-                
                 # Ждем завершения потока с таймаутом
                 if not self.thread.wait(3000):  # 3 секунды
                     self.logger.warning("Поток не завершился вовремя, принудительное завершение")
                     self.thread.terminate()  # Принудительное завершение
-                    
                     # Подождем еще немного для очистки ресурсов
                     if not self.thread.wait(1000):
                         self.logger.error("Не удалось принудительно завершить поток!")
             except Exception as e:
                 self.logger.error(f"Ошибка при завершении потока: {str(e)}")
-        
         # Обновляем состояние независимо от успеха остановки
         self.is_monitoring = False
         self.is_processing = False
